@@ -1,4 +1,4 @@
-Require Import While.
+Require Import Disel.While.
 
 Require Import ExtrOcamlBasic.
 

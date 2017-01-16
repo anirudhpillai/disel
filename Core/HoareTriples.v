@@ -4,10 +4,12 @@ From mathcomp
 Require Import path.
 Require Import Eqdep.
 Require Import Relation_Operators.
-Require Import pred prelude idynamic ordtype finmap pcm unionmap heap coding.
+From Heaps
+Require Import pred prelude idynamic ordtype finmap pcm unionmap heap coding domain.
+From Disel
 Require Import Freshness State EqTypeX DepMaps Protocols Worlds NetworkSem Rely.
+From Disel
 Require Import Actions Injection Process Always.
-Require Import domain.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -390,7 +392,7 @@ End Inject.
 
 
 Section InductiveInv.
-Require Import InductiveInv.
+Require Import Disel.InductiveInv.
 Variable pr : protocol.
 
 (* Decompose the initial protocol *)

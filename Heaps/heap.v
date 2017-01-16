@@ -2,7 +2,9 @@ From mathcomp.ssreflect
 Require Import ssreflect ssrbool ssrnat eqtype ssrfun seq.
 From mathcomp
 Require Import path div.
-Require Import Eqdep pred idynamic ordtype pcm finmap unionmap.
+From Heaps
+Require Import pred idynamic ordtype pcm finmap unionmap.
+Require Import Eqdep.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.

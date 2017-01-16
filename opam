@@ -1,7 +1,7 @@
 opam-version: "1.2"
 name: "disel"
 version: "dev"
-maintainer: "jrw12@cs.washington.edu"
+maintainer: "palmskog@gmail.com"
 
 homepage: "https://github.com/DistributedComponents/disel"
 dev-repo: "https://github.com/DistributedComponents/disel.git"
@@ -16,5 +16,5 @@ depends: [
   "coq-mathcomp-ssreflect" {>= "1.6"}
 ]
 
-tags: [ "keyword:separation logic" "date:2016-12-31"]
+tags: [ "keyword:separation logic" ]
 authors: [ "Ilya Sergey <>" "James Wilcox <>" ]

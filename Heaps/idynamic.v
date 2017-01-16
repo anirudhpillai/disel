@@ -1,6 +1,8 @@
 From mathcomp.ssreflect
 Require Import ssreflect ssrfun.
-Require Import Eqdep prelude.
+From Heaps
+Require Import prelude.
+Require Import Eqdep.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
