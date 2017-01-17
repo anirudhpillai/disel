@@ -5,6 +5,6 @@
 ## Configuration options for coqproject.sh
 DIRS=(Core Heaps)
 CANARIES=("mathcomp.ssreflect.ssreflect" "DiSeL requires mathcomp-ssreflect to be installed")
-NAMESPACE_Core="Disel"
-NAMESPACE_Heaps="Heaps"
+NAMESPACE_Core="DiSeL.Core"
+NAMESPACE_Heaps="DiSeL.Heaps"
 source scripts/coqproject.sh

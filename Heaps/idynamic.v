@@ -1,6 +1,6 @@
 From mathcomp.ssreflect
 Require Import ssreflect ssrfun.
-From Heaps
+From DiSeL.Heaps
 Require Import prelude.
 Require Import Eqdep.
 Set Implicit Arguments.

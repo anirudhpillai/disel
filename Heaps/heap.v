@@ -2,7 +2,7 @@ From mathcomp.ssreflect
 Require Import ssreflect ssrbool ssrnat eqtype ssrfun seq.
 From mathcomp
 Require Import path div.
-From Heaps
+From DiSeL.Heaps
 Require Import pred idynamic ordtype pcm finmap unionmap.
 Require Import Eqdep.
 Set Implicit Arguments.
@@ -73,7 +73,7 @@ Definition ptr_ordMixin := OrdMixin ltn_ptr_irr ltn_ptr_trans ltn_ptr_total.
 Canonical ptr_ordType := OrdType ptr ptr_ordMixin.
 
 (*********)
-(* Heaps *)
+(* DiSeL.Heaps *)
 (*********)
 
 Module Heap.

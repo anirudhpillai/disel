@@ -1,4 +1,4 @@
-Require Import Disel.While.
+Require Import DiSeL.Core.While.
 
 Require Import ExtrOcamlBasic.
 

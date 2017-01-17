@@ -4,11 +4,11 @@ From mathcomp
 Require Import path.
 Require Import Eqdep.
 Require Import Relation_Operators.
-From Heaps
+From DiSeL.Heaps
 Require Import pred prelude idynamic ordtype finmap pcm unionmap heap coding.
-From Disel
+From DiSeL.Core
 Require Import Freshness State EqTypeX DepMaps Protocols Worlds NetworkSem Rely.
-From Disel
+From DiSeL.Core
 Require Import Actions Injection Process.
 
 Set Implicit Arguments.
@@ -456,7 +456,7 @@ Notation alwsafe s p := (always s p (fun _ _ => True)).
 
 Module AlwaysInductiveInv.
 Section AlwaysInductiveInv.
-Require Import Disel.InductiveInv.
+Require Import DiSeL.Core.InductiveInv.
 Variable pr : protocol.
 
 (* Decompose the initial protocol *)

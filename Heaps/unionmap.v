@@ -2,7 +2,7 @@ From mathcomp.ssreflect
 Require Import ssreflect ssrbool ssrnat eqtype ssrfun seq.
 From mathcomp
 Require Import path.
-From Heaps
+From DiSeL.Heaps
 Require Import idynamic ordtype finmap pcm.
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -14,7 +14,7 @@ Unset Printing Implicit Defensive.
 
 (* I decided to have union_map_class be a class, rather than a
 structure. The class packages a condition on keys. Ordinary union_maps
-have a trivially true condition. Heaps have a condition that the
+have a trivially true condition. DiSeL.Heaps have a condition that the
 pointers are non-null.  Then ordinary union maps, as well as heaps,
 are declared as instances of this class, to automatically inherit all
 the lemmas about the operations.

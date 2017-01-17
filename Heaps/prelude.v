@@ -1,6 +1,6 @@
 From mathcomp.ssreflect
 Require Import ssreflect ssrbool ssrnat eqtype ssrfun seq.
-From Heaps
+From DiSeL.Heaps
 Require Import pred.
 Require Import Eqdep ClassicalFacts.
 Set Implicit Arguments.
