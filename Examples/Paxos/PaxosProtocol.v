@@ -49,15 +49,6 @@ Definition StateT := (nat * RoleState)%type.
 Variable proposers : seq nid.
 (* Acceptor nodes *)
 Variable acceptors : seq nid.
-
-(** ??
-Still don't completely understand the coherence, need to read up.
-The coherence predicate constraints the local state of each node.
-*)
-Definition localCoh (n : nid) : Pred heap :=
-  [Pred h | valid h /\ exists (s : StateT), h = st :-> s].
-
-
 (* Involved nodes *)
 Definition nodes := proposers ++ acceptors.
 
@@ -93,8 +84,27 @@ Definition tagFromAcceptor (t : nat) : bool :=
   (t \in [:: promise_resp; nack_resp; accepted_resp]).
 
 
+
+(*** Defining Coherence ***)
+
+(**
+Coherence predicate defines the shape of the statelet.
+i.e. it components of the local state and message soup properties.
+Therefore, we need to write coherence functions for both the
+local state and message soup and then combine them to create PaxosCoh.
+ *)
+
+
 (** ??
-Why is this needed? What does tms_count do?
+Don't know how this function works and how reading from the heap works.
+localCoh constraints the local state of each node.
+*)
+Definition localCoh (n : nid) : Pred heap :=
+  [Pred h | valid h /\ exists (s : StateT), h = st :-> s].
+
+
+(** ??
+What does tms_count do?
 Messages from Acceptor contain a Proposal/Nack
 Need to change (y : nat) to (y : Proposal)
 *)
@@ -104,17 +114,14 @@ Definition msgFromAcceptor (tms : TaggedMessage) (y : nat) : bool :=
 Definition tagFromProposer (t : nat) : bool :=
   (t \in [:: prepare_req; accept_req]).
 
-(* ??
-Same as above for Acceptor
-Messages from Propser contain a proposal
-*)
 Definition msgFromProposer (tms : TaggedMessage) (y : nat) : Prop :=
   let: body := tms_cont tms in exists data, body = y :: data.
 
 
 (* ??
 This is saying that a proposer can only send a message to an acceptor and vice versa.
-Not sure if we need to impose this for Paxos.
+Not sure if we need to impose this for Paxos especially since we have just one 
+RoleState..
 *)
 Definition cohMsg (ms: msg TaggedMessage) (y : nat) : Prop :=
   if from ms \in proposers
@@ -124,9 +131,7 @@ Definition cohMsg (ms: msg TaggedMessage) (y : nat) : Prop :=
        else True.
 
 (** ??
-A bit lost now. Need to read up about all the uses of coherence.
-Is this the coherence that holds over the message soup?
-Not sure what's happening here.
+Coherence for the message soup.
 *)
 Definition soupCoh : Pred soup :=
   [Pred s | valid s /\
@@ -156,7 +161,18 @@ Proof. by case. Qed.
 Definition PaxosCoh := CohPred (CohPredMixin l1 l2 l3).
 
 
+(* TODO: Transition Lemmas *)
+
+
+(* TODO: Getter lemmas for local state *))
 
 
 
+(*** State Transitions ***)
 
+(**
+Step function dictactes how the state of the node changes 
+after performing the send transition.
+ *)
+(* Need to figure out how to incorporate Proposal everywhere. *)
+(* Definition step_send (s: StateT) (to: nid) (d: data) *)
