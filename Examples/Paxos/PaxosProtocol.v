@@ -19,25 +19,30 @@ Import Prenex Implicits.
 Definition nid := nat.
 Definition data := seq nid.
 
-Inductive Proposal :=
-| proposal of nat & nat
-| nack.
+Definition proposal := (nat * nat)%type.
+(* Promise -> seq (node * promise/nack * accepted_proposal) *)
+Definition promises := seq (nid * bool * proposal).
 
-(* Proposer states *)
+(* States of the nodes *)
 Inductive RoleState :=
 (* Proposer States *)
-(* Initialised with a proposal number and random value*)
-| PInit of Proposal
+(* Initialised with a proposal (p_no * p_val) *)
+| PInit of proposal
 (* Sent prepare message to some Acceptors at a current stage *)
-| PSentPrep of data & Proposal
+(* seq nid holds nodes which were sent the message *)
+| PSentPrep of data & seq nid & proposal
 (* Received promises/NACKs from Acceptors *)
-| PWaitPrepResponse of data & seq Proposal & Proposal
+| PWaitPrepResponse of data & promises & proposal
 (* Send AcceptRequest *)
-| PSentAccReq of data & Proposal
+| PSentAccReq of data & seq nid & proposal
+(* Finished executing after sending AccReq or not receiving majority*)
+| PAbort
 (* Acceptor states *)
 | AInit
-| APromised of Proposal
-| AAccepted of Proposal.
+(* Holds the highest number promised *)
+| APromised of nat
+(* Holds the highest number proposal accepted *)
+| AAccepted of proposal.
 
 (* Pointer to the state *)
 Definition st := ptr_nat 1.
@@ -164,15 +169,87 @@ Definition PaxosCoh := CohPred (CohPredMixin l1 l2 l3).
 (* TODO: Transition Lemmas *)
 
 
-(* TODO: Getter lemmas for local state *))
+(* TODO: Getter lemmas for local state *)
 
 
 
 (*** State Transitions ***)
 
+
+Fixpoint choose_highest_numbered_proposal (p: proposal) (xs: promises): proposal :=
+  let (p_no, p_val) := p in
+  match xs with
+  | cons (_, _, (p_no1, p_val1)) rest =>
+         if p_no1 > p_no
+         then choose_highest_numbered_proposal (p_no1, p_val1) rest
+         else choose_highest_numbered_proposal (p_no, p_val) rest
+  | _ => p
+  end.
+
+(* Choose value of highest numbered proposal received from acceptors *)
+Fixpoint create_proposal_for_acc_req (recv_promises: promises) (p: proposal):
+  proposal :=
+  let (p_no, p_val) := p in
+  match recv_promises with
+  | cons (_, _, (p_no1, p_val1)) xs =>
+    let max_proposal := choose_highest_numbered_proposal (p_no1, p_val1) xs in
+    let (_, choosen_value) := max_proposal in
+    (p_no, choosen_value)
+  | nil => p
+  end.
+
+(* Test for highest numbered proposal
+Compute create_proposal_for_acc_req [:: (1, true, (1, 1));
+                                    (3, false, (3, 4));
+                                    (2, true, (2, 8))
+                                    ] (9, 1).
+ *)
+
+Definition fst' (tup: (nat * bool * proposal)%type): nat :=
+  match tup with
+  | (x, b, props) => x
+  end.
+
+Definition snd' (tup: (nat * bool * proposal)%type): bool :=
+  match tup with
+  | (x, b, props) => b
+  end.
+
 (**
 Step function dictactes how the state of the node changes 
 after performing the send transition.
- *)
-(* Need to figure out how to incorporate Proposal everywhere. *)
-(* Definition step_send (s: StateT) (to: nid) (d: data) *)
+*)
+
+(* Changes in the Node state triggered upon send *)
+Definition step_send (s: StateT) (to : nid) (d : data) (p: proposal): StateT :=
+    let: (e, rs) := s in
+    match rs with
+    (* Proposer state transitions *)
+    | PInit p' =>
+      if acceptors == [:: to]
+      then (e, PWaitPrepResponse d [::] p')
+      else (e, PSentPrep d [:: to] p')
+    (* Sending prepare messages *)
+    | PSentPrep d' tos p' =>
+      (* Do not duplicate prepare-requests *)
+      if perm_eq (to :: tos) acceptors
+      (* If all sent, switch to the receiving state *)
+      then (e, PWaitPrepResponse d' [::] p')
+      else (e, PSentPrep d' (to :: tos) p') (* Keep sending *)
+    (* Waiting for promises *)
+    | PWaitPrepResponse d' recv_promises p' =>
+      (* If majority (all promises) received *)
+      if (perm_eq (map fst' recv_promises) acceptors)
+      then if all (fun r => r) (map snd' recv_promises) (* If no nacks *)
+           then let: new_p := create_proposal_for_acc_req recv_promises p' in
+                (e, PSentAccReq d' [:: to] new_p)
+           else (e, PAbort) (* Nack recieved so abort *)
+      else (e, rs) (* Keep waiting *)
+    (* Sending Accept Request *)
+    | PSentAccReq d' tos p' =>
+      if perm_eq (to :: tos) acceptors
+      then (e, PAbort) (* Finished sending accept requests *)
+      else (e, PSentAccReq d' (to :: tos) p') (* Keep sending *)
+    (* Acceptor state transitions *)
+    | _ => (e, rs)
+    end.
