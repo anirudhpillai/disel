@@ -39,8 +39,10 @@ Inductive RoleState :=
 | PAbort
 (* Acceptor states *)
 | AInit
-(* Holds the highest number promised *)
-| APromised of nat
+(* Holds the highest number promised in the proposal *)
+(* Storing a proposal and not just a nat as this makes it easier to catch the payload
+later on in the transitions *)
+| APromised of proposal
 (* Holds the highest number proposal accepted *)
 | AAccepted of proposal.
 
@@ -74,7 +76,7 @@ Definition eval_resp : nat := 6.
 
 
 Definition ttag := nat.
-Definition payload := seq nat.
+Definition payload := proposal.
 
 Definition tags : seq ttag :=
   [:: prepare_req;
@@ -216,9 +218,15 @@ Definition snd' (tup: (nat * bool * proposal)%type): bool :=
   end.
 
 (**
+Send Transitions:
+- Proposer: sPrep, sAccReq
+- Acceptor: sPromise, sNack
+*)
+
+(**
 Step function dictactes how the state of the node changes 
 after performing the send transition.
-*)
+ *)
 
 (* Changes in the Node state triggered upon send *)
 Definition step_send (s: StateT) (to : nid) (d : data) (p: proposal): StateT :=
@@ -251,5 +259,59 @@ Definition step_send (s: StateT) (to : nid) (d : data) (p: proposal): StateT :=
       then (e, PAbort) (* Finished sending accept requests *)
       else (e, PSentAccReq d' (to :: tos) p') (* Keep sending *)
     (* Acceptor state transitions *)
+    | APromised p' =>
+      let (p_no, p_val) := p in
+      let (curr_p_no, curr_p_val) := p' in
+      if p_no > curr_p_no (* If promising higher number *)
+      then (e, APromised p) (* Update promised number by storing new proposal *)
+      else (e, APromised p') (* We'll send NACK so don't need to update *)
+    (* Don't think I need transitions from AAccepted state *)
     | _ => (e, rs)
     end.
+
+
+(** ?? Do I need the ?_matches_tag s mtag : bool function? *)
+
+(**
+Receive Transitions:
+- Proposer: rPromise, rNack
+- Acceptor: rPrep, rAccReq
+*)
+
+(* Changes in the Node state triggered upon receive *)
+Definition step_recv' (s : StateT) (from : nid) (mtag : ttag) (p: proposal)
+           (mbody : payload): StateT :=
+  let: (e, rs) := s in
+  let: (p_no, p_val) := p in
+  match rs with
+  (* Proposer states *)
+  | PWaitPrepResponse d' recv_promises p' =>
+    (* All responses already collected or 
+       already received from this participant  *)
+    if (from \in (map fst' recv_promises))
+    then s
+    (* Save result *)
+    else (e, PWaitPrepResponse d' ((from, mtag == promise_resp, mbody) :: recv_promises) p')
+(** NOTE: If I check if mtag == promise_resp in the else tag, I can directly go 
+to PAbort state from here. That would be receiving a rNack resp. *)
+(** ??
+Do I need to add receive transition for PWaitPrepResp -> PSentAcceptReq?
+The state change is in step_send but it's a receive transition that causes the state
+to change not a send transition. *)
+  (* Acceptor States *)
+  (* Haven't promised anything so need to promise the first prepare message *)
+  | AInit => (e, APromised p)
+(** ??
+Do I need to add receive transition for APromised -> APromised when it receives
+a new prepare message? *)
+  | APromised p' =>
+    if mtag == accept_req
+    then let: (curr_p_no, _) := p' in
+         if p_no > curr_p_no
+         then (e, AAccepted p) (* Accept AccReq *)
+         else (e, APromised p')
+    else s (* NOTE: Can add another if statement here to check mtag == prep_req 
+and then move to APromised with a higher promised number if successful *)
+  | _ => s
+  end.
+
