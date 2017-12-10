@@ -418,67 +418,62 @@ Definition node_send_trans :=
 
 End GenericSendTransitions.
 
+(* Send prepare request transition *)
+Definition send_prepare_req_prec (p: StateT) (m: payload) :=
+  (exists n psal, p = (n, PInit psal)) \/
+  (exists n d tos psal, p = (n, PSentPrep d tos psal)).
 
-(** Generic send-transitions **)
-
-(* Send Prepare transition *)
-
-(* Precondition is for the state of the node before sending the message m *)
-
-(* Send-Prepare transition *)
-Definition send_prep_prec (p: StateT) (m: payload) :=
-  exists n psal, p = (n, PInit psal) \/
-  exists n d tos psal, p = (n, PSentPrep d tos psal).
-
-Program Definition send_prep_trans : send_trans PaxosCoh :=
-  @node_send_trans prepare_req send_prep_prec _.
+Program Definition send_prepare_req_trans : send_trans PaxosCoh :=
+  @node_send_trans prepare_req send_prepare_req_prec _.
 Next Obligation.
   admit.
 Admitted.
 
-(* Send-Accept-Request transition *)
+(* Send accept request transition *)
 Definition send_acc_req_prec (p: StateT) (m: payload) :=
   (exists n d promises psal,
     [/\ p = (n, PWaitPrepResponse d promises psal),
      perm_eq (map fst' promises) acceptors & all (fun r => r) (map snd' promises)]).
 
-Program Definition cn_send_commit_trans : send_trans PaxosCoh :=
+Program Definition send_acc_req_trans : send_trans PaxosCoh :=
   @node_send_trans accept_req send_acc_req_prec _.
 Next Obligation.
   admit.
 Admitted.
 
-(* TODO: Add acceptor send transitions, send_promise, send_nack *)
+Definition proposal_gt (p p': proposal): Prop :=
+  let: p_no := head 0 p in
+  let: p_no' := head 0 p in
+  p_no > p_no'.
 
-(*
-Program Definition gen_send_trans (t : ttag)
-        (T: t \in [:: promise_resp; nack_resp])
-        (ps : proposal -> RoleState) :=
-  @node_send_trans t (send_prep_resp_prec ps) _.
+(* Send promise response transition *)
+(* received proposal in message must have higher number than current proposal *)
+Definition send_promise_resp_prec (p: StateT) (m: payload) :=
+  (exists n, p = (n, AInit)) \/
+  (exists n psal, p = (n, APromised psal) \/ proposal_gt m psal).
+
+Program Definition send_promise_resp_trans : send_trans PaxosCoh :=
+  @node_send_trans accept_req send_promise_resp_prec _.
 Next Obligation.
   admit.
 Admitted.
 
-Check gen_send_trans.
+(* Send nack response transition *)
+(* received proposal in message must have lower number than current proposal *)
+Definition send_nack_resp_prec (p: StateT) (m: payload) :=
+  (exists n, p = (n, AInit)) \/
+  (exists n psal, p = (n, APromised psal) \/ not (proposal_gt m psal)).
 
-Program Definition send_promise_trans :=
-  @gen_send_trans promise_resp _ AAccepted.
-
-Program Definition send_nack_trans :=
-  @gen_send_trans promise_resp _ AAccepted.
-
-Program Definition send_promise_trans :=
-  @gen_send_trans promise_resp _ APromised.
-
-Program Definition send_nack_trans :=
-  @gen_send_trans promise_resp _ APromised.
- *)
+Program Definition send_nack_resp_trans : send_trans PaxosCoh :=
+  @node_send_trans accept_req send_nack_resp_prec _.
+Next Obligation.
+  admit.
+Admitted.
 
 Section GenericReceiveTransitions.
 
 Notation coh := PaxosCoh.
 
-(* Send-prepare *)
 Variable r_tag : ttag.
 Variable r_wf : forall d, coh d -> nid -> nid -> pred payload.
 
@@ -487,14 +482,26 @@ Definition r_step : receive_step_t coh :=
     let s := getSt pf pt in
     mkLocal (step_recv s from r_tag m).
 
-(* Lemma rp_step_coh : r_step_coh_t rp_wf rp_tag rp_step. *)
-(* Proof. *)
-(*   admit. *)
-(* Admitted. *)
+Lemma r_step_coh : r_step_coh_t r_wf r_tag r_step.
+Proof.
+  admit.
+Admitted.
 
-
-(* (* Generic participan receive-transition *) *)
-(* Definition rp_recv_trans := ReceiveTrans rp_step_coh. *)
+Definition recv_trans := ReceiveTrans r_step_coh.
 
 End GenericReceiveTransitions.
-  
+
+Definition msg_wf d (_ : PaxosCoh d) (this from : nid) :=
+  [pred p : payload | true].
+
+(* Got prepare request *)
+Definition receive_prep_trans := recv_trans prepare_req msg_wf.
+
+(* Got accept request *)
+Definition receive_acc_req_trans := recv_trans accept_req msg_wf.
+
+(* Got promise response *)
+Definition receive_promise_trans := recv_trans promise_resp msg_wf.
+
+(* Got nack response *)
+Definition receive_nack_trans := recv_trans nack_resp msg_wf.
