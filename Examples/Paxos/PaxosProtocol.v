@@ -19,7 +19,8 @@ Import Prenex Implicits.
 Definition nid := nat.
 Definition data := seq nid.
 
-Definition proposal := (nat * nat)%type.
+(* seq of two elements p_no, p_val *)
+Definition proposal := seq nat.
 (* Promise -> seq (node * promise/nack * accepted_proposal) *)
 Definition promises := seq (nid * bool * proposal).
 
@@ -190,33 +191,39 @@ Defined.
 
 
 Fixpoint choose_highest_numbered_proposal (p: proposal) (xs: promises): proposal :=
-  let (p_no, p_val) := p in
+  let: p_no := head 0 p in 
+  let: p_val := last 0 p in 
   match xs with
-  | cons (_, _, (p_no1, p_val1)) rest =>
-         if p_no1 > p_no
-         then choose_highest_numbered_proposal (p_no1, p_val1) rest
-         else choose_highest_numbered_proposal (p_no, p_val) rest
+  | cons (_, _, p') rest =>
+    let: p_no1 := head 0 p' in
+    let: p_val1 := last 0 p' in 
+    if p_no1 > p_no
+    then choose_highest_numbered_proposal [:: p_no1; p_val1] rest
+    else choose_highest_numbered_proposal [:: p_no; p_val] rest
   | _ => p
   end.
 
 (* Choose value of highest numbered proposal received from acceptors *)
 Fixpoint create_proposal_for_acc_req (recv_promises: promises) (p: proposal):
   proposal :=
-  let (p_no, p_val) := p in
+  let: p_no := head 0 p in 
+  let: p_val := last 0 p in 
   match recv_promises with
-  | cons (_, _, (p_no1, p_val1)) xs =>
-    let max_proposal := choose_highest_numbered_proposal (p_no1, p_val1) xs in
-    let (_, choosen_value) := max_proposal in
-    (p_no, choosen_value)
+  | cons (_, _, p') xs =>
+    let: p_no1 := head 0 p' in
+    let: p_val1 := last 0 p' in 
+    let: max_proposal := choose_highest_numbered_proposal [:: p_no1; p_val1] xs in
+    let: choosen_value := last 0 max_proposal in 
+    [:: p_no; choosen_value]
   | nil => p
   end.
 
 (* Test for highest numbered proposal
-Compute create_proposal_for_acc_req [:: (1, true, (1, 1));
-                                    (3, false, (3, 4));
-                                    (2, true, (2, 8))
-                                    ] (9, 1).
- *)
+Compute create_proposal_for_acc_req [:: (1, true, [:: 1; 1]);
+                                    (3, false, [:: 3; 4]);
+                                    (2, true, [:: 2; 8])
+                                    ] [:: 9; 1].
+*)
 
 Definition fst' (tup: (nat * bool * proposal)%type): nat :=
   match tup with
@@ -271,8 +278,10 @@ Definition step_send (s: StateT) (to : nid) (d : data) (p: proposal): StateT :=
       else (e, PSentAccReq d' (to :: tos) p') (* Keep sending *)
     (* Acceptor state transitions *)
     | APromised p' =>
-      let (p_no, p_val) := p in
-      let (curr_p_no, curr_p_val) := p' in
+      let: p_no := head 0 p in 
+      let: p_val := last 0 p in
+      let: curr_p_no := head 0 p' in 
+      let: curr_p_val := last 0 p' in
       if p_no > curr_p_no (* If promising higher number *)
       then (e, APromised p) (* Update promised number by storing new proposal *)
       else (e, APromised p') (* We'll send NACK so don't need to update *)
@@ -295,7 +304,8 @@ Definition payload := proposal.
 Definition step_recv (s : StateT) (from : nid) (mtag : ttag) (p: proposal)
            (mbody : payload): StateT :=
   let: (e, rs) := s in
-  let: (p_no, p_val) := p in
+  let: p_no := head 0 p in 
+  let: p_val := last 0 p in 
   match rs with
   (* Proposer states *)
   | PWaitPrepResponse d' recv_promises p' =>
@@ -319,7 +329,7 @@ Do I need to add receive transition for APromised -> APromised when it receives
 a new prepare message? *)
   | APromised p' =>
     if mtag == accept_req
-    then let: (curr_p_no, _) := p' in
+    then let: curr_p_no := head 0 p' in
          if p_no > curr_p_no
          then (e, AAccepted p) (* Accept AccReq *)
          else (e, APromised p')
@@ -354,7 +364,7 @@ Variable ptag : ttag.
 
 (* Precondition -- this is the way one can define multiple send-transitions *)
 (* TODO: change seq nat to payload *)
-Variable prec : StateT -> seq nat -> Prop.
+Variable prec : StateT -> payload -> Prop.
 
 (* Making sure that the precondition is legit *)
 Lemma this_in this to : HPn this to -> this \in nodes.
@@ -363,7 +373,7 @@ Proof.
 Admitted.
 
 Definition node_safe (this n : nid)
-           (d : dstatelet) (msg : seq nat) :=
+           (d : dstatelet) (msg : payload) :=
   HPn this n /\ 
   exists (Hp : HPn this n) (C : coh d), prec (getSt C (this_in Hp)) msg.
 
@@ -383,7 +393,7 @@ Admitted.
 Variable commit : bool.
 
 Definition node_step (this to : nid) (d : dstatelet)
-           (msg : seq nat)
+           (msg : payload)
            (pf : node_safe this to d msg) :=
   let C := node_safe_coh pf in
   let s := getSt C (this_in (proj1 pf)) in
@@ -406,18 +416,17 @@ Admitted.
 Definition node_send_trans :=
   SendTrans node_safe_coh node_safe_in node_safe_def node_step_coh.
 
-Check node_send_trans.
-
 End GenericSendTransitions.
 
 
 (** Generic send-transitions **)
 
 (* Send Prepare transition *)
-(* TODO: need to change m to payload *)
 
 (* Precondition is for the state of the node before sending the message m *)
-Definition send_prep_prec (p: StateT) (m: seq nat) :=
+
+(* Send-Prepare transition *)
+Definition send_prep_prec (p: StateT) (m: payload) :=
   exists n psal, p = (n, PInit psal) \/
   exists n d tos psal, p = (n, PSentPrep d tos psal).
 
@@ -426,6 +435,20 @@ Program Definition send_prep_trans : send_trans PaxosCoh :=
 Next Obligation.
   admit.
 Admitted.
+
+(* Send-Accept-Request transition *)
+Definition send_acc_req_prec (p: StateT) (m: payload) :=
+  (exists n d promises psal,
+    [/\ p = (n, PWaitPrepResponse d promises psal),
+     perm_eq (map fst' promises) acceptors & all (fun r => r) (map snd' promises)]).
+
+Program Definition cn_send_commit_trans : send_trans PaxosCoh :=
+  @node_send_trans accept_req send_acc_req_prec _.
+Next Obligation.
+  admit.
+Admitted.
+
+(* TODO: Add acceptor send transitions, send_promise, send_nack *)
 
 (*
 Program Definition gen_send_trans (t : ttag)
@@ -449,5 +472,29 @@ Program Definition send_promise_trans :=
 
 Program Definition send_nack_trans :=
   @gen_send_trans promise_resp _ APromised.
-*)
+ *)
+
+Section GenericReceiveTransitions.
+
+Notation coh := PaxosCoh.
+
+(* Send-prepare *)
+Variable r_tag : ttag.
+Variable r_wf : forall d, coh d -> nid -> nid -> pred payload.
+
+Definition r_step : receive_step_t coh :=
+  fun this (from : nid) (m : proposal) d (pf : coh d) (pt : this \in nodes) =>
+    let s := getSt pf pt in
+    mkLocal (step_recv s from r_tag m).
+
+(* Lemma rp_step_coh : r_step_coh_t rp_wf rp_tag rp_step. *)
+(* Proof. *)
+(*   admit. *)
+(* Admitted. *)
+
+
+(* (* Generic participan receive-transition *) *)
+(* Definition rp_recv_trans := ReceiveTrans rp_step_coh. *)
+
+End GenericReceiveTransitions.
   
