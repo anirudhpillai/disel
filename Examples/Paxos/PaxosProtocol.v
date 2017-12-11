@@ -16,6 +16,12 @@ Unset Strict Implicit.
 Import Prenex Implicits.
 
 
+Module PaxosProtocol.
+
+  
+Module States.
+
+    
 Definition nid := nat.
 Definition data := seq nid.
 
@@ -52,6 +58,13 @@ Definition st := ptr_nat 1.
 
 (* Pairing with the current stage of type nat *)
 Definition StateT := (nat * RoleState)%type.
+
+
+End States.
+
+Import States.
+
+Section PaxosProtocol.
 
 (* Proposer nodes *)
 Variable proposers : seq nid.
@@ -418,6 +431,8 @@ Definition node_send_trans :=
 
 End GenericSendTransitions.
 
+Section SendTransitions.
+
 (* Send prepare request transition *)
 Definition send_prepare_req_prec (p: StateT) (m: payload) :=
   (exists n psal, p = (n, PInit psal)) \/
@@ -470,6 +485,8 @@ Next Obligation.
   admit.
 Admitted.
 
+End SendTransitions.
+
 Section GenericReceiveTransitions.
 
 Notation coh := PaxosCoh.
@@ -491,17 +508,88 @@ Definition recv_trans := ReceiveTrans r_step_coh.
 
 End GenericReceiveTransitions.
 
+Section ReceiveTransitions.
+
 Definition msg_wf d (_ : PaxosCoh d) (this from : nid) :=
   [pred p : payload | true].
 
 (* Got prepare request *)
-Definition receive_prep_trans := recv_trans prepare_req msg_wf.
+Definition receive_prepare_req_trans := recv_trans prepare_req msg_wf.
 
 (* Got accept request *)
 Definition receive_acc_req_trans := recv_trans accept_req msg_wf.
 
 (* Got promise response *)
-Definition receive_promise_trans := recv_trans promise_resp msg_wf.
+Definition receive_promise_resp_trans := recv_trans promise_resp msg_wf.
 
 (* Got nack response *)
-Definition receive_nack_trans := recv_trans nack_resp msg_wf.
+Definition receive_nack_resp_trans := recv_trans nack_resp msg_wf.
+
+End ReceiveTransitions.
+
+
+Section Protocol.
+
+(* Putting it all together *)
+Variable l : Label.
+
+(* All send-transitions *)
+Definition paxos_sends :=
+  [::
+     send_prepare_req_trans;
+     send_acc_req_trans;
+     send_promise_resp_trans;
+     send_nack_resp_trans
+  ].
+
+(* All receive-transitions *)
+Definition paxos_receives :=
+  [::
+     receive_prepare_req_trans;
+     receive_acc_req_trans;
+     receive_promise_resp_trans;
+     receive_nack_resp_trans
+  ].
+
+
+Program Definition PaxosProtocol : protocol :=
+  @Protocol _ l _ paxos_sends paxos_receives _ _.
+Next Obligation.
+  admit.
+Admitted.
+
+
+End Protocol.
+End PaxosProtocol.
+
+Module Exports.
+Section Exports.
+      
+Definition PaxosProtocol := PaxosProtocol.
+
+Definition send_prepare_req_trans := send_prepare_req_trans.
+Definition send_acc_req_trans := send_acc_req_trans.
+Definition send_promise_resp_trans := send_promise_resp_trans.
+Definition send_nack_resp_trans := send_nack_resp_trans.
+
+Definition receive_prepare_req_trans := receive_prepare_req_trans.
+Definition receive_acc_req_trans := receive_acc_req_trans.
+Definition receive_promise_resp_trans := receive_promise_resp_trans.
+Definition receive_nack_resp_trans := receive_nack_resp_trans.
+
+(* Paxos Tags *)
+Definition prepare_req := prepare_req.
+Definition accept_req := accept_req.
+Definition promise_resp := promise_resp.
+Definition nack_resp := nack_resp.
+
+(* Getter *)
+Definition getSt := getSt.
+
+End Exports.
+End Exports.
+
+End PaxosProtocol.
+
+Export PaxosProtocol.States.
+Export PaxosProtocol.Exports.
