@@ -184,21 +184,20 @@ Definition PaxosCoh := CohPred (CohPredMixin l1 l2 l3).
 (* TODO: Getter lemmas for local state *)
 
 (* NOTE: These are temporary, no idea what I've done here *)
-Lemma cohSt n d (C : PaxosCoh d) (H : n \in nodes) s:
+Lemma cohSt n d (C : PaxosCoh d) s:
   find st (getLocal n d) = Some s ->
-  idyn_tp s = StateT. 
+  idyn_tp s = StateT.
 Proof.
   admit.
 Admitted.
 
-Program Definition getSt n d (C : PaxosCoh d) (pf : n \in nodes) : StateT.
-Proof.
-case X: (n \in nodes); last by exact: (0, AInit).
-exact: (match find st (getLocal n d) as f return _ = f -> _ with
-          Some v => fun epf => icoerce id (idyn_val v) (cohSt C X epf)
-        | _ => fun epf => (0, AInit)
-        end (erefl _)).
-Defined.
+Definition getSt n d (C : PaxosCoh d) : StateT :=
+  match find st (getLocal n d) as f return _ = f -> _ with
+    Some v => fun epf => icoerce id (idyn_val v) (cohSt C epf)
+  | _ => fun epf => (0, AInit)
+  end (erefl _).
+
+Check getSt.
 
 (*** State Transitions ***)
 
@@ -388,7 +387,7 @@ Admitted.
 Definition node_safe (this n : nid)
            (d : dstatelet) (msg : payload) :=
   HPn this n /\ 
-  exists (Hp : HPn this n) (C : coh d), prec (getSt C (this_in Hp)) msg.
+  exists (Hp : HPn this n) (C : coh d), prec (getSt this C) msg.
 
 Lemma node_safe_coh this to d m : node_safe this to d m -> coh d.
 Proof.
@@ -409,7 +408,7 @@ Definition node_step (this to : nid) (d : dstatelet)
            (msg : payload)
            (pf : node_safe this to d msg) :=
   let C := node_safe_coh pf in
-  let s := getSt C (this_in (proj1 pf)) in
+  let s := getSt this C in
   Some (mkLocal (step_send s commit)).
 
 Check s_step_coh_t coh.
@@ -496,7 +495,7 @@ Variable r_wf : forall d, coh d -> nid -> nid -> pred payload.
 
 Definition r_step : receive_step_t coh :=
   fun this (from : nid) (m : proposal) d (pf : coh d) (pt : this \in nodes) =>
-    let s := getSt pf pt in
+    let s := getSt this pf in
     mkLocal (step_recv s from r_tag m).
 
 Lemma r_step_coh : r_step_coh_t r_wf r_tag r_step.
@@ -557,7 +556,6 @@ Program Definition PaxosProtocol : protocol :=
 Next Obligation.
   admit.
 Admitted.
-
 
 End Protocol.
 End PaxosProtocol.
