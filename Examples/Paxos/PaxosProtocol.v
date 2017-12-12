@@ -37,11 +37,11 @@ Inductive RoleState :=
 | PInit of proposal
 (* Sent prepare message to some Acceptors at a current stage *)
 (* seq nid holds nodes which were sent the message *)
-| PSentPrep of data & seq nid & proposal
+| PSentPrep of seq nid & proposal
 (* Received promises/NACKs from Acceptors *)
-| PWaitPrepResponse of data & promises & proposal
+| PWaitPrepResponse of promises & proposal
 (* Send AcceptRequest *)
-| PSentAccReq of data & seq nid & proposal
+| PSentAccReq of seq nid & proposal
 (* Finished executing after sending AccReq or not receiving majority*)
 | PAbort
 (* Acceptor states *)
@@ -197,10 +197,8 @@ Definition getSt n d (C : PaxosCoh d) : StateT :=
   | _ => fun epf => (0, AInit)
   end (erefl _).
 
-Check getSt.
 
 (*** State Transitions ***)
-
 
 Fixpoint choose_highest_numbered_proposal (p: proposal) (xs: promises): proposal :=
   let: p_no := head 0 p in 
@@ -259,35 +257,35 @@ after performing the send transition.
  *)
 
 (* Changes in the Node state triggered upon send *)
-Definition step_send (s: StateT) (to : nid) (d : data) (p: proposal): StateT :=
+Definition step_send (s: StateT) (to : nid) (p: proposal): StateT :=
     let: (e, rs) := s in
     match rs with
     (* Proposer state transitions *)
     | PInit p' =>
       if acceptors == [:: to]
-      then (e, PWaitPrepResponse d [::] p')
-      else (e, PSentPrep d [:: to] p')
+      then (e, PWaitPrepResponse [::] p')
+      else (e, PSentPrep [:: to] p')
     (* Sending prepare messages *)
-    | PSentPrep d' tos p' =>
+    | PSentPrep tos p' =>
       (* Do not duplicate prepare-requests *)
       if perm_eq (to :: tos) acceptors
       (* If all sent, switch to the receiving state *)
-      then (e, PWaitPrepResponse d' [::] p')
-      else (e, PSentPrep d' (to :: tos) p') (* Keep sending *)
+      then (e, PWaitPrepResponse [::] p')
+      else (e, PSentPrep (to :: tos) p') (* Keep sending *)
     (* Waiting for promises *)
-    | PWaitPrepResponse d' recv_promises p' =>
+    | PWaitPrepResponse recv_promises p' =>
       (* If majority (all promises) received *)
       if (perm_eq (map fst' recv_promises) acceptors)
       then if all (fun r => r) (map snd' recv_promises) (* If no nacks *)
            then let: new_p := create_proposal_for_acc_req recv_promises p' in
-                (e, PSentAccReq d' [:: to] new_p)
+                (e, PSentAccReq [:: to] new_p)
            else (e, PAbort) (* Nack recieved so abort *)
       else (e, rs) (* Keep waiting *)
     (* Sending Accept Request *)
-    | PSentAccReq d' tos p' =>
+    | PSentAccReq tos p' =>
       if perm_eq (to :: tos) acceptors
       then (e, PAbort) (* Finished sending accept requests *)
-      else (e, PSentAccReq d' (to :: tos) p') (* Keep sending *)
+      else (e, PSentAccReq (to :: tos) p') (* Keep sending *)
     (* Acceptor state transitions *)
     | APromised p' =>
       let: p_no := head 0 p in 
@@ -320,7 +318,7 @@ Definition step_recv (s : StateT) (from : nid) (mtag : ttag) (p: proposal)
   let: p_val := last 0 p in 
   match rs with
   (* Proposer states *)
-  | PWaitPrepResponse d' recv_promises p' =>
+  | PWaitPrepResponse recv_promises p' =>
     (* All responses already collected or 
        already received from this participant  *)
     if (from \in (map fst' recv_promises))
@@ -328,7 +326,7 @@ Definition step_recv (s : StateT) (from : nid) (mtag : ttag) (p: proposal)
     (* Save result *)
     else if mtag == nack_resp
          then (e, PAbort) (* Abort if we see nack *)
-         else (e, PWaitPrepResponse d' ((from, mtag == promise_resp, mbody) :: recv_promises) p')
+         else (e, PWaitPrepResponse ((from, mtag == promise_resp, mbody) :: recv_promises) p')
 (** ??
 Do I need to add receive transition for PWaitPrepResp -> PSentAcceptReq?
 The state change is in step_send but it's a receive transition that causes the state
@@ -435,7 +433,7 @@ Section SendTransitions.
 (* Send prepare request transition *)
 Definition send_prepare_req_prec (p: StateT) (m: payload) :=
   (exists n psal, p = (n, PInit psal)) \/
-  (exists n d tos psal, p = (n, PSentPrep d tos psal)).
+  (exists n tos psal, p = (n, PSentPrep tos psal)).
 
 Program Definition send_prepare_req_trans : send_trans PaxosCoh :=
   @node_send_trans prepare_req send_prepare_req_prec _.
@@ -445,8 +443,8 @@ Admitted.
 
 (* Send accept request transition *)
 Definition send_acc_req_prec (p: StateT) (m: payload) :=
-  (exists n d promises psal,
-    [/\ p = (n, PWaitPrepResponse d promises psal),
+  (exists n promises psal,
+    [/\ p = (n, PWaitPrepResponse promises psal),
      perm_eq (map fst' promises) acceptors & all (fun r => r) (map snd' promises)]).
 
 Program Definition send_acc_req_trans : send_trans PaxosCoh :=
