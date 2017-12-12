@@ -37,16 +37,23 @@ Section ProposerImplementation.
 (************** Atomic actions **************)
 
 (* Two send-actions, e -- id of the current era *)
-Program Definition send_prepare_req e data to :=
+(* TODO: 
+- Factor in how to encode round number 
+- Probably something like [::e; psal]?
+- Better would be to have a proposal as [round_no, p_no, p_val]
+but p_no is supposed to work as round no, need to rethink probably
+as we exit and go to PAbort instead of retrying.
+*)
+Program Definition send_prepare_req psal to :=
   act (@send_action_wrapper W paxos p l (prEq paxos)
-       (send_prepare_req_trans proposers acceptors) _ (e :: data) to).
+       (send_prepare_req_trans proposers acceptors) _ psal to).
 Next Obligation.
   admit.
 Admitted.
 
-Program Definition send_acc_req e to :=
+Program Definition send_acc_req psal to :=
   act (@send_action_wrapper W paxos p l (prEq paxos)
-       (send_acc_req_trans proposers acceptors) _ [:: e] to).
+       (send_acc_req_trans proposers acceptors) _ psal to).
 Next Obligation.
   admit.
 Admitted.
@@ -71,8 +78,6 @@ Notation loc i := (getLocal p (getStatelet i l)).
 
 Export PaxosProtocol.
 
-Check getSt.
-
 Program Definition read_round:
   {(ecl : (nat * RoleState))}, DHT [p, W]
   (fun i => loc i = st :-> ecl, 
@@ -88,25 +93,25 @@ Admitted.
 (***   Sending out proposals in a loop   ***)
 (*******************************************)
 
-Definition send_prepare_req_loop_spec (e : nat) d psal:= forall to_send,
+Definition send_prepare_req_loop_spec (e : nat) psal:= forall to_send,
   DHT [p, W]
   (fun i =>
      loc i = st :-> (e, PInit psal) /\ perm_eq acceptors to_send \/
      if to_send == [::]
-     then loc i = st :-> (e, PWaitPrepResponse d [::] psal)
+     then loc i = st :-> (e, PWaitPrepResponse [::] psal)
      else exists (acptrs : seq nid),
-         loc i = st :-> (e, PSentPrep d acptrs psal) /\
+         loc i = st :-> (e, PSentPrep acptrs psal) /\
          perm_eq acceptors (acptrs ++ to_send),
-     fun r m => r = tt /\ loc m = st :-> (e, PWaitPrepResponse d [::] psal)).
+     fun r m => r = tt /\ loc m = st :-> (e, PWaitPrepResponse [::] psal)).
 
-Program Definition send_prepare_req_loop e d psal:
+Program Definition send_prepare_req_loop e psal:
   DHT [p, W] 
   (fun i => loc i = st :-> (e, PInit psal),
    fun r m => r = tt /\
-              loc m = st :-> (e, PWaitPrepResponse d [::] psal)) :=
-  Do (ffix (fun (rec : send_prepare_req_loop_spec e d psal) to_send => 
+              loc m = st :-> (e, PWaitPrepResponse [::] psal)) :=
+  Do (ffix (fun (rec : send_prepare_req_loop_spec e psal) to_send => 
               Do (match to_send with
-                  | to :: tos => send_prepare_req e d to ;; rec tos
+                  | to :: tos => send_prepare_req psal to ;; rec tos
                   | [::] => ret _ _ tt
                   end)) acceptors).
 Next Obligation.
@@ -124,18 +129,21 @@ Admitted.
 Definition rc_prepare_resp_cond (acc : promises) := ~~ perm_eq (map fst' acc) acceptors.
 
 (* Invariant relates the argument and the shape of the state *)
-Definition rc_prepare_resp_inv (e : nat) (d : data) (psal: proposal): cont (promises) :=
-  fun acc i => loc i = st :-> (e, PWaitPrepResponse d acc psal).
+Definition rc_prepare_resp_inv (e : nat) (psal: proposal): cont (promises) :=
+  fun acc i => loc i = st :-> (e, PWaitPrepResponse acc psal).
 
-
+(* TODO: 
+- check use of Hoare spec here 
+- check what function construct is created by rc_prepare_resp_in e 
+*)
 Program Definition receive_prepare_resp_loop (e : nat) (psal: proposal):
-  {(dp : data * proposal)}, DHT [p, W]
-  (fun i => loc i = st :-> (e, PWaitPrepResponse dp.1 [::] psal),
+  {(p' : proposal)}, DHT [p, W]
+  (fun i => loc i = st :-> (e, PWaitPrepResponse [::] psal),
    fun res m => 
-       loc m = st :-> (e, PWaitPrepResponse dp.1 res dp.2) /\
+       loc m = st :-> (e, PWaitPrepResponse res psal) /\
        (perm_eq (map fst' res) acceptors))
   :=
-  Do _ (@while p W _ _ rc_prepare_resp_cond (rc_prepare_resp_inv e psal) _
+  Do _ (@while p W _ _ rc_prepare_resp_cond (rc_prepare_resp_inv e) _
         (fun recv_promises => Do _ (
            r <-- tryrecv_prepare_resp;
            match r with
@@ -165,15 +173,15 @@ Admitted.
 Definition read_res (st : StateT) :=
   let: (_, rs) := st in
   match rs with
-  | PWaitPrepResponse _ res _ => res
+  | PWaitPrepResponse res _ => res
   | _ => [::]
   end.
 
 (* Reading the accumulated responses from the state *)
 Program Definition read_resp_result :
-  {(e : nat) (d : data) (psal : proposal) res}, DHT [p, W]
-  (fun i => loc i = st :-> (e, PWaitPrepResponse d res psal),
-   fun r m => loc m = st :-> (e, PWaitPrepResponse d res psal) /\
+  {(e : nat) (psal : proposal) res}, DHT [p, W]
+  (fun i => loc i = st :-> (e, PWaitPrepResponse res psal),
+   fun r m => loc m = st :-> (e, PWaitPrepResponse res psal) /\
               r = all (fun i => i) (map snd' res)) :=
   Do (act (@skip_action_wrapper W p l paxos (prEq paxos) _
           (fun s pf => all (fun i => i) (map snd' (read_res (getSt p pf)))))).
@@ -185,15 +193,15 @@ Admitted.
 (* Coordinator's prelude *)
 (*************************)
 
-Program Definition coordinator_prelude (d : data) (psal: proposal): DHT [p, W]
+Program Definition coordinator_prelude (psal: proposal): DHT [p, W]
   (fun i => exists (e : nat), loc i = st :-> (e, PInit psal),
    fun r m => let: (res, b) := r in
        exists (e : nat),
-       [/\ loc m = st :-> (e, PWaitPrepResponse d res psal),
+       [/\ loc m = st :-> (e, PWaitPrepResponse res psal),
            perm_eq (map fst' res) acceptors &
            b = all id (map snd' res)]) :=
   Do (e <-- read_round;
-      send_prepare_req_loop e d psal;;
+      send_prepare_req_loop e psal;;
       res <-- receive_prepare_resp_loop e psal;
       b <-- read_resp_result;
       ret _ _ (res, b)).
@@ -205,39 +213,39 @@ Admitted.
 (***    Sending accept requests          ***)
 (*******************************************)
 
-Definition send_acc_req_loop_spec (e : nat) d psal := forall to_send,
+Definition send_acc_req_loop_spec (e : nat) psal := forall to_send,
   DHT [p, W]
   (fun i =>
      (exists res,
-         [/\ loc i = st :-> (e, PWaitPrepResponse d res psal),
+         [/\ loc i = st :-> (e, PWaitPrepResponse res psal),
           to_send = acceptors, perm_eq (map fst' res) acceptors &
           all id (map snd' res)]) \/
      if to_send == [::]
-     then loc i = st :-> (e, PSentAccReq d [::] psal)
+     then loc i = st :-> (e, PSentAccReq [::] psal)
      else exists (acptrs : seq nid),
-         loc i = st :-> (e, PSentAccReq d acptrs psal) /\
+         loc i = st :-> (e, PSentAccReq acptrs psal) /\
          perm_eq acceptors (acptrs ++ to_send),
-   fun (r : unit) m => loc m = st :-> (e, PSentAccReq d [::] psal)).
+   fun (r : unit) m => loc m = st :-> (e, PSentAccReq [::] psal)).
 
-Program Definition send_acc_req_loop e d psal: send_acc_req_loop_spec e d psal :=
+Program Definition send_acc_req_loop e psal: send_acc_req_loop_spec e psal :=
   fun to_send  =>
     Do (fix rec to_send :=
           (match to_send with
-           | to :: tos => send_acc_req e to ;; rec tos
+           | to :: tos => send_acc_req psal to ;; rec tos
            | [::] => ret _ _ tt
            end)) to_send.
 Next Obligation.
   admit.
 Admitted.
 
-Program Definition send_acc_reqs e d psal:
+Program Definition send_acc_reqs e psal:
   DHT [p, W]
   (fun i => exists recv_promises,
-         [/\ loc i = st :-> (e, PWaitPrepResponse d recv_promises psal),
+         [/\ loc i = st :-> (e, PWaitPrepResponse recv_promises psal),
           perm_eq (map fst' recv_promises) acceptors &
           all id (map snd' recv_promises)],
-   fun (r : unit) m => loc m = st :-> (e, PSentAccReq d [::] psal))
-  := Do (send_acc_req_loop e d psal acceptors).
+   fun (r : unit) m => loc m = st :-> (e, PSentAccReq [::] psal))
+  := Do (send_acc_req_loop e psal acceptors).
 Next Obligation.
   admit.
 Admitted.
@@ -251,22 +259,28 @@ Admitted.
 - change to send the proposal that was read from read_resp_result 
 - change else clause
 *)
-Program Definition proposer_round (d : data) (psal: proposal):
+Program Definition proposer_round (psal: proposal):
   {(e : nat)}, DHT [p, W]
   (fun i => loc i = st :-> (e, PInit psal),
    fun res m => loc m = st :-> (e.+1, PAbort))
   :=
   Do (e <-- read_round;
-      send_prepare_req_loop e d psal;;
+      send_prepare_req_loop e psal;;
       res <-- receive_prepare_resp_loop e psal;
       b <-- read_resp_result;
       (if b
-       then send_acc_reqs e d psal
-       else send_acc_reqs e d psal);;
+       then send_acc_reqs e psal
+       else send_acc_reqs e psal);;
       ret _ _ b).
 Next Obligation.
   admit.
 Admitted.
+
+(* 
+Don't we need this part of Paxos as we'll intialise each Proposer with a proposal.
+So we can use proposer_round to do that and run the proposer.
+This also ensures that a proposer only tries once and then goes into PAbort.
+
 
 (*****************************************************)
 (*    Announcing a list of data transactions         *)
@@ -282,6 +296,25 @@ Program Definition proposer_loop (psal: proposal) : proposer_loop_spec :=
   fun dts =>
     Do (fix rec dts :=
           (match dts with
-           | d :: dts => proposer_round d psal;; rec dts
+           | d :: dts => proposer_round psal;; rec dts
            | [::] => ret _ _ tt
            end)) dts.
+Next Obligation.
+  admit.
+Admitted.
+ *)
+
+End ProposerImplementation.
+End PaxosProposer.
+
+Module Exports.
+Section Exports.
+
+Definition proposer_round := proposer_round.
+
+End Exports.
+End Exports.
+
+End PaxosProposer.
+
+Export PaxosProposer.Exports.
