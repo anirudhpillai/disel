@@ -95,6 +95,7 @@ Admitted.
 
 (* Step 1: Receive prepare req *)
 
+(* TODO: Check ending condition *)
 (* Ending condition *)
 Definition r_prepare_req_cond (res : option proposal) := res == None.
 
@@ -139,7 +140,6 @@ Next Obligation.
 Admitted.
 
 
-
 (* Finds the promised number from current state *)
 Definition read_promised_number (rs: RoleState) :=
   match rs with
@@ -161,6 +161,55 @@ Next Obligation.
   admit.
 Admitted.
 
+(* TODO: Check ending condition *)
+(* Ending condition *)
+Definition r_acc_req_cond (res : option proposal) := res == None.
+
+(* ??  Do I need to check the higher proposal number according to the state? *)
+(* Invariant relates the argument and the shape of the state *)
+Definition r_acc_req_inv (e : nat) : cont (option proposal) :=
+  fun res i =>
+    if res is Some psal
+    then loc i = st :-> (e, AAccepted psal)
+    else loc i = st :-> (e, AInit).
+
+(* Loops until it receives a prepare req *)
+Program Definition receive_acc_req_loop (e : nat):
+  {(pinit: proposal)}, DHT [a, W]
+   (fun i => loc i = st :-> (e, AInit) \/
+             loc i = st :-> (e, APromised),
+   fun res m => exists psal, res = Some psal /\ (
+                               loc m = st :-> (e, AInit) \/
+                               loc m = st :-> (e, APromised psal) \/
+                               loc m = st :-> (e, AAccepted psal)
+                             )
+  )
+  :=
+  (* TODO: Check the functional construct formed by r_prepare_req_in *)
+  Do _ (@while a W _ _ r_acc_req_cond (r_acc_req_inv) _
+        (fun _ => Do _ (
+           r <-- tryrecv_prepare_req;
+           match r with
+           | Some (from, tg, body) => ret _ _ body
+           | None => ret _ _ [::]
+           end              
+        )) None).
+Next Obligation.
+  admit.
+Admitted.
+Next Obligation.
+  admit.
+Admitted.
+Next Obligation.
+  admit.
+Admitted.
+Next Obligation.
+  admit.
+Admitted.
+Next Obligation.
+  admit.
+Admitted.
+
 
 (* Using resp_to_prepare_req 0 as a 'do nothing' transition for now.
 As 0 will never be > 0 so the acceptor won't send a promise *)
@@ -171,10 +220,13 @@ Program Definition acceptor_round:
   := 
     Do _ (e <-- read_round;
           msg <-- receive_prepare_req_loop e;
-          match msg with
+          (match msg with
           | Some (cons p_no p_val) => resp_to_prepare_req e p_no
           | _  => resp_to_prepare_req e 0
-          end).
+          end);;
+          receive_acc_req_loop e).
+         (** ?? I think don't need to respond to accept request as the step_recv
+          function in the protocol file handles updating state? *)
 Next Obligation.
   admit.
 Admitted.
