@@ -1,3 +1,8 @@
+open Datatypes
+
+open Util
+open Shim
+
 type mode = Proposer | Acceptor
 
 let mode : mode option ref = ref None
@@ -15,21 +20,21 @@ let usage msg =
   print_newline ();
   print_endline "Options are as follows:";
   print_endline "    -me <NAME>           the identity of this node (required)";
-  print_endline "    -mode <MODE>         whether this node is the coordinator or participant (required)";
-  print_endline "    -coordinator <NAME>  the identity of the coordinator (required if mode=client)";
+  print_endline "    -mode <MODE>         whether this node is the proposer or acceptor (required)";
+  print_endline "    -coordinator <NAME>  the identity of the proposer (required if mode=proposer)";
   exit 1
 
 
 let rec parse_args = function
   | [] -> ()
-  | "-mode" :: "proposer" :: args ->
-      begin
-        mode := Some Proposer;
-        parse_args args
-      end
   | "-mode" :: "acceptor" :: args ->
       begin
         mode := Some Acceptor;
+        parse_args args
+      end
+  | "-mode" :: "proposer" :: args ->
+      begin
+        mode := Some Proposer;
         parse_args args
       end
   | "-me" :: name :: args ->
@@ -60,13 +65,12 @@ let main () =
           | 1 -> SimplePaxosApp.a_runner1 ()
           | 2 -> SimplePaxosApp.a_runner2 ()
           | 3 -> SimplePaxosApp.a_runner3 ()
-          | n -> usage ("unknown acceptor name " ^ string_of_int n)
+          | n -> usage ("unknown participant name " ^ string_of_int n)
         end
      | Proposer ->
-        begin match int_of_nat me with
-          | 1 -> SimplePaxosApp.p_runner1 ()
-          | n -> usage ("unknown proposer name " ^ string_of_int n)
-        end
+        try
+          SimplePaxosApp.p_runner ()
+        with _ -> print_endline "An acceptor closed its connection. Proposer exiting."
     end
   | _, _ -> usage "-mode and -me must be given"
 
