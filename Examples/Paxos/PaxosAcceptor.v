@@ -233,3 +233,19 @@ Admitted.
 Next Obligation.
   admit.
 Admitted.
+
+End AcceptorImplementation.
+End PaxosAcceptor.
+
+Module Exports.
+Section Exports.
+
+Definition acceptor_round := acceptor_round.
+  
+End Exports.
+End Exports.
+
+End PaxosAcceptor.
+
+
+Export PaxosAcceptor.Exports.
