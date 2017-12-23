@@ -53,3 +53,9 @@ Examples/TwoPhaseCommit/TwoPhaseExtraction.v
 Examples/TwoPhaseCommit/TwoPhaseInductiveInv.v
 Examples/TwoPhaseCommit/TwoPhaseInductiveProof.v 
 Examples/Querying/QueryPlusTPC.v
+Examples/Paxos/PaxosProtocol.v
+Examples/Paxos/PaxosProposer.v
+Examples/Paxos/PaxosAcceptor.v
+Examples/Paxos/PaxosInductiveInv.v
+Examples/Paxos/SimplePaxosApp.v
+Examples/Paxos/PaxosExtraction.v

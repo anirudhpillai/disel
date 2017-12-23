@@ -19,6 +19,9 @@ Makefile.coq: _CoqProject
 TPCMain.d.byte: default
 	ocamlbuild -libs unix -I extraction/TPC -I shims shims/TPCMain.d.byte
 
+PaxosMain.d.byte: default
+	ocamlbuild -libs unix -I extraction/Paxos -I shims shims/PaxosMain.d.byte
+
 CalculatorMain.d.byte: default
 	ocamlbuild -libs unix -I extraction/calculator -I shims shims/CalculatorMain.d.byte
 
