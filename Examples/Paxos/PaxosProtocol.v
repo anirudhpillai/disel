@@ -23,7 +23,6 @@ Module States.
 
     
 Definition nid := nat.
-Definition data := seq nid.
 
 (* seq of two elements p_no, p_val *)
 Definition proposal := seq nat.
@@ -80,27 +79,13 @@ Definition nack_resp : nat := 2.
 Definition accept_req : nat := 3.
 
 
-(** ??
-Don't know if or why this is needed
-Interaction with the clients 
-*)
-Definition eval_req : nat := 4.
-Definition eval_resp : nat := 5.
-
-
 Definition ttag := nat.
 
 Definition tags : seq ttag :=
   [:: prepare_req;
      promise_resp;
      nack_resp;
-     accept_req;
-     eval_req;
-     eval_resp].
-
-Definition tagFromAcceptor (t : nat) : bool :=
-  (t \in [:: promise_resp; nack_resp]).
-
+     accept_req].
 
 
 (*** Defining Coherence ***)
@@ -125,7 +110,11 @@ Definition localCoh (n : nid) : Pred heap :=
 What does tms_count do?
 Messages from Acceptor contain a Proposal/Nack
 Need to change (y : nat) to (y : Proposal)
-*)
+ *)
+
+Definition tagFromAcceptor (t : nat) : bool :=
+  (t \in [:: promise_resp; nack_resp]).
+
 Definition msgFromAcceptor (tms : TaggedMessage) (y : nat) : bool :=
     tagFromAcceptor (tag tms) && (tms_cont tms == [:: y]).
 
@@ -366,53 +355,52 @@ Section GenericSendTransitions.
 
 Notation coh := PaxosCoh.
 
-Definition HPn this to := (this \in nodes /\ to \in nodes).
+Definition Hin this to := (this \in nodes /\ to \in nodes).
 Definition mkLocal {T} (sl : T) := st :-> sl.
 Check mkLocal.
 
 Variable ptag : ttag.
 
 (* Precondition -- this is the way one can define multiple send-transitions *)
-(* TODO: change seq nat to payload *)
 Variable prec : StateT -> payload -> Prop.
 
 (* Making sure that the precondition is legit *)
-Lemma this_in this to : HPn this to -> this \in nodes.
+Lemma this_in this to : Hin this to -> this \in nodes.
 Proof.
-  admit.
-Admitted.
+  by case.
+Qed.
 
 Definition node_safe (this n : nid)
            (d : dstatelet) (msg : payload) :=
-  HPn this n /\ 
-  exists (Hp : HPn this n) (C : coh d), prec (getSt this C) msg.
+  Hin this n /\ 
+  exists (Hp : Hin this n) (C : coh d), prec (getSt this C) msg.
 
 Lemma node_safe_coh this to d m : node_safe this to d m -> coh d.
 Proof.
-  admit.
-Admitted.
-
-Check node_safe_coh.
+  case.
+  move => in_nodes.
+  case.
+  move => in_nodes2.
+  case => coh_d H_coh_d => //.
+Qed.
 
 Lemma node_safe_in this to d m : node_safe this to d m ->
                                this \in nodes /\ to \in nodes.
 Proof.
-  admit.
-Admitted.
-
-Variable commit : bool.
+  case.
+  move => Hin e_clause => //.
+Qed.
 
 Definition node_step (this to : nid) (d : dstatelet)
            (msg : payload)
            (pf : node_safe this to d msg) :=
   let C := node_safe_coh pf in
   let s := getSt this C in
-  Some (mkLocal (step_send s commit)).
-
-Check s_step_coh_t coh.
+  Some (mkLocal (step_send s to msg)).
 
 Lemma node_step_coh : s_step_coh_t coh ptag node_step.
 Proof.
+  move=>this to d msg pf h[]->{h}.
   admit.
 Admitted.
 
@@ -435,11 +423,8 @@ Definition send_prepare_req_prec (p: StateT) (m: payload) :=
   (exists n psal, p = (n, PInit psal)) \/
   (exists n tos psal, p = (n, PSentPrep tos psal)).
 
-Program Definition send_prepare_req_trans : send_trans PaxosCoh :=
-  @node_send_trans prepare_req send_prepare_req_prec _.
-Next Obligation.
-  admit.
-Admitted.
+Definition send_prepare_req_trans : send_trans PaxosCoh :=
+  @node_send_trans prepare_req send_prepare_req_prec.
 
 (* Send accept request transition *)
 Definition send_acc_req_prec (p: StateT) (m: payload) :=
@@ -447,11 +432,8 @@ Definition send_acc_req_prec (p: StateT) (m: payload) :=
     [/\ p = (n, PWaitPrepResponse promises psal),
      perm_eq (map fst' promises) acceptors & all (fun r => r) (map snd' promises)]).
 
-Program Definition send_acc_req_trans : send_trans PaxosCoh :=
-  @node_send_trans accept_req send_acc_req_prec _.
-Next Obligation.
-  admit.
-Admitted.
+Definition send_acc_req_trans : send_trans PaxosCoh :=
+  @node_send_trans accept_req send_acc_req_prec.
 
 Definition proposal_gt (p p': proposal): Prop :=
   let: p_no := head 0 p in
@@ -464,11 +446,8 @@ Definition send_promise_resp_prec (p: StateT) (m: payload) :=
   (exists n, p = (n, AInit)) \/
   (exists n psal, p = (n, APromised psal) \/ proposal_gt m psal).
 
-Program Definition send_promise_resp_trans : send_trans PaxosCoh :=
-  @node_send_trans accept_req send_promise_resp_prec _.
-Next Obligation.
-  admit.
-Admitted.
+Definition send_promise_resp_trans : send_trans PaxosCoh :=
+  @node_send_trans promise_resp send_promise_resp_prec.
 
 (* Send nack response transition *)
 (* received proposal in message must have lower number than current proposal *)
@@ -476,11 +455,8 @@ Definition send_nack_resp_prec (p: StateT) (m: payload) :=
   (exists n, p = (n, AInit)) \/
   (exists n psal, p = (n, APromised psal) \/ not (proposal_gt m psal)).
 
-Program Definition send_nack_resp_trans : send_trans PaxosCoh :=
-  @node_send_trans accept_req send_nack_resp_prec _.
-Next Obligation.
-  admit.
-Admitted.
+Definition send_nack_resp_trans : send_trans PaxosCoh :=
+  @node_send_trans nack_resp send_nack_resp_prec.
 
 End SendTransitions.
 
@@ -548,12 +524,8 @@ Definition paxos_receives :=
      receive_nack_resp_trans
   ].
 
-
 Program Definition PaxosProtocol : protocol :=
   @Protocol _ l _ paxos_sends paxos_receives _ _.
-Next Obligation.
-  admit.
-Admitted.
 
 End Protocol.
 End PaxosProtocol.
