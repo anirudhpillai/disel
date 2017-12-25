@@ -40,28 +40,29 @@ Section ProposerImplementation.
 - Better would be to have a proposal as [round_no, p_no, p_val]
 but p_no is supposed to work as round no, need to rethink probably
 as we exit and go to PAbort instead of retrying.
-*)
+ *)
 Program Definition send_prepare_req psal to :=
   act (@send_action_wrapper W paxos p l (prEq paxos)
        (send_prepare_req_trans proposers acceptors) _ psal to).
 Next Obligation.
-  admit.
-Admitted.
+  by rewrite InE; do![left|right].
+Qed.
 
 Program Definition send_acc_req psal to :=
   act (@send_action_wrapper W paxos p l (prEq paxos)
        (send_acc_req_trans proposers acceptors) _ psal to).
 Next Obligation.
-  admit.
-Admitted.
+  by rewrite !InE; right; left.
+Qed.
+
 
 (* Two receive-actions *)
 Program Definition tryrecv_prepare_resp := act (@tryrecv_action_wrapper W p
       (* filter *)
       (fun k _ t b => (k == l) && ((t == promise_resp) || (t == nack_resp))) _).
 Next Obligation.
-  admit.
-Admitted.
+  by case/andP: H=>/eqP->_; rewrite /ddom gen_domPt inE/=.
+Qed.
 
 
 (************** Proposer code **************)
@@ -155,11 +156,11 @@ Program Definition receive_prepare_resp_loop (e : nat):
            end              
         )) [::]).
 Next Obligation.
-  admit.
-Admitted.
+  by apply: with_spec x.
+Defined.
 Next Obligation.
-  admit.
-Admitted.
+  by move:H; rewrite /rc_prepare_resp_inv (rely_loc' _ H0).
+Qed.
 Next Obligation.
   admit.
 Admitted.

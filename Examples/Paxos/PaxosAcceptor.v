@@ -31,33 +31,33 @@ Notation W := (mkWorld paxos).
 Section AcceptorImplementation.
 
 (************** Atomic actions **************)
-  
+
 (* Two receive-actions *)
 Program Definition tryrecv_prepare_req := act (@tryrecv_action_wrapper W a
       (fun k _ t b => (k == l) && (t == prepare_req)) _).
 Next Obligation.
-  admit.
-Admitted.
+  by case/andP: H=>/eqP->_; rewrite /ddom gen_domPt inE/=.
+Qed.
 
 Program Definition tryrecv_accept_req :=
   act (@tryrecv_action_wrapper W a
   (fun k _ t b => (k == l) && (t == accept_req)) _).
 Next Obligation.
-  admit.
-Admitted.
+  by case/andP: H=>/eqP->_; rewrite /ddom gen_domPt inE/=.
+Qed.
 
 (* Two send-actions, e -- id of the current era *)
 Program Definition send_promise_resp to :=
   act (@send_action_wrapper W paxos a l (prEq paxos) (send_promise_resp_trans proposers acceptors) _ [::] to).
 Next Obligation.
-  admit.
-Admitted.
+  rewrite !InE. right. right. left. done.
+Qed.
 
 Program Definition send_nack_resp to :=
   act (@send_action_wrapper W paxos a l (prEq paxos) (send_nack_resp_trans proposers acceptors) _ [::] to).
 Next Obligation.
-  admit.
-Admitted.
+  rewrite !InE. right. right. right. done.
+Qed.  
 
 
 (************** Acceptor code **************)
@@ -101,7 +101,7 @@ Definition r_prepare_req_cond (res : option proposal) := res == None.
 
 (* ??  Do I need to check the higher proposal number according to the state? *)
 (* Invariant relates the argument and the shape of the state *)
-Definition r_prepare_req_inv (e : nat) : cont (option proposal) :=
+Definition r_prepare_req_inv (e : nat) (pinit: proposal): cont (option proposal) :=
   fun res i =>
     if res is Some psal
     then loc i = st :-> (e, APromised psal)
@@ -111,27 +111,22 @@ Definition r_prepare_req_inv (e : nat) : cont (option proposal) :=
 Program Definition receive_prepare_req_loop (e : nat):
   DHT [a, W]
   (fun i => loc i = st :-> (e, AInit),
-   fun res m => exists psal, res = Some psal /\
-       loc m = st :-> (e, APromised psal))
+   fun res m => exists psal, res = Some psal /\ loc m = st :-> (e, APromised psal))
   :=
-  (* TODO: Check the functional construct formed by r_prepare_req_in *)
-  Do _ (@while a W _ _ r_prepare_req_cond (r_prepare_req_inv) _
+  Do _ (@while a W _ _ r_prepare_req_cond (r_prepare_req_inv e) _
         (fun _ => Do _ (
            r <-- tryrecv_prepare_req;
            match r with
-           | Some (from, tg, body) => ret _ _ body
-           | None => ret _ _ [::]
+           | Some (from, tg, body) => ret _ _ (Some body)
+           | None => ret _ _ None
            end              
         )) None).
 Next Obligation.
-  admit.
-Admitted.
+  by apply: with_spec x.
+Defined.
 Next Obligation.
-  admit.
-Admitted.
-Next Obligation.
-  admit.
-Admitted.
+  by move:H; rewrite /r_prepare_req_inv (rely_loc' _ H0).
+Qed.
 Next Obligation.
   admit.
 Admitted.
@@ -167,7 +162,7 @@ Definition r_acc_req_cond (res : option proposal) := res == None.
 
 (* ??  Do I need to check the higher proposal number according to the state? *)
 (* Invariant relates the argument and the shape of the state *)
-Definition r_acc_req_inv (e : nat) : cont (option proposal) :=
+Definition r_acc_req_inv (e : nat) (psal: proposal) : cont (option proposal) :=
   fun res i =>
     if res is Some psal
     then loc i = st :-> (e, AAccepted psal)
@@ -186,23 +181,20 @@ Program Definition receive_acc_req_loop (e : nat):
   )
   :=
   (* TODO: Check the functional construct formed by r_prepare_req_in *)
-  Do _ (@while a W _ _ r_acc_req_cond (r_acc_req_inv) _
+  Do _ (@while a W _ _ r_acc_req_cond (r_acc_req_inv e) _
         (fun _ => Do _ (
            r <-- tryrecv_prepare_req;
            match r with
-           | Some (from, tg, body) => ret _ _ body
-           | None => ret _ _ [::]
+           | Some (from, tg, body) => ret _ _ (Some body)
+           | None => ret _ _ None
            end              
         )) None).
 Next Obligation.
-  admit.
-Admitted.
+  by apply: (with_spec x).
+Defined.
 Next Obligation.
-  admit.
-Admitted.
-Next Obligation.
-  admit.
-Admitted.
+  by move:H; rewrite /r_acc_req_inv (rely_loc' _ H0).
+Qed.
 Next Obligation.
   admit.
 Admitted.
@@ -224,12 +216,10 @@ Program Definition acceptor_round:
           | Some (cons p_no p_val) => resp_to_prepare_req e p_no
           | _  => resp_to_prepare_req e 0
           end);;
-          receive_acc_req_loop e).
+         receive_acc_req_loop e;;
+         ret _ _ tt).
          (** ?? I think don't need to respond to accept request as the step_recv
           function in the protocol file handles updating state? *)
-Next Obligation.
-  admit.
-Admitted.
 Next Obligation.
   admit.
 Admitted.
