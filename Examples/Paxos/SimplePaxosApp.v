@@ -103,18 +103,20 @@ Next Obligation.
   admit.
 Admitted.
 
+Variables (p' : proposal).
+Variables (p_1 a_1 a_2 a_3: nat).
 (* [Run] Runnable nodes *)
-Program Definition run_proposer1 := run_proposer p1 [:: 1; 1].
-Program Definition run_acceptor1 := run_acceptor a1.
-Program Definition run_acceptor2 := run_acceptor a2.
-Program Definition run_acceptor3 := run_acceptor a3.
-
+Program Definition run_proposer1 := run_proposer p1 p'.
+Program Definition run_acceptor1 := run_acceptor a_1.
+Program Definition run_acceptor2 := run_acceptor a_2.
+Program Definition run_acceptor3 := run_acceptor a_3.
+Check run_proposer1.
 End SimplePaxosApp.
 
 (* [Run] Final programs to run with actual arguments supplied *)
 
-Definition p_runner (u : unit) := run_proposer1.
+Definition p_runner (u : unit) := run_proposer1 [:: 1; 1].
 
-Definition a_runner1 (u : unit) := run_acceptor1.
-Definition a_runner2 (u : unit) := run_acceptor2.
-Definition a_runner3 (u : unit) := run_acceptor3.
+Definition a_runner1 (u : unit) := run_acceptor1 2.
+Definition a_runner2 (u : unit) := run_acceptor2 3.
+Definition a_runner3 (u : unit) := run_acceptor3 4.
