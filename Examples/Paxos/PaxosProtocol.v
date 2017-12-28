@@ -38,7 +38,7 @@ Inductive RoleState :=
 (* seq nid holds nodes which were sent the message *)
 | PSentPrep of seq nid & proposal
 (* Received promises/NACKs from Acceptors *)
-| PWaitPrepResponse of promises & proposal
+| PWaitPrepResp of promises & proposal
 (* Send AcceptRequest *)
 | PSentAccReq of seq nid & proposal
 (* Finished executing after sending AccReq or not receiving majority*)
@@ -252,17 +252,17 @@ Definition step_send (s: StateT) (to : nid) (p: proposal): StateT :=
     (* Proposer state transitions *)
     | PInit p' =>
       if acceptors == [:: to]
-      then (e, PWaitPrepResponse [::] p')
+      then (e, PWaitPrepResp [::] p')
       else (e, PSentPrep [:: to] p')
     (* Sending prepare messages *)
     | PSentPrep tos p' =>
       (* Do not duplicate prepare-requests *)
       if perm_eq (to :: tos) acceptors
       (* If all sent, switch to the receiving state *)
-      then (e, PWaitPrepResponse [::] p')
+      then (e, PWaitPrepResp [::] p')
       else (e, PSentPrep (to :: tos) p') (* Keep sending *)
     (* Waiting for promises *)
-    | PWaitPrepResponse recv_promises p' =>
+    | PWaitPrepResp recv_promises p' =>
       (* If majority (all promises) received *)
       if (perm_eq (map fst' recv_promises) acceptors)
       then if all (fun r => r) (map snd' recv_promises) (* If no nacks *)
@@ -307,7 +307,7 @@ Definition step_recv (s : StateT) (from : nid) (mtag : ttag) (p: proposal)
   let: p_val := last 0 p in 
   match rs with
   (* Proposer states *)
-  | PWaitPrepResponse recv_promises p' =>
+  | PWaitPrepResp recv_promises p' =>
     (* All responses already collected or 
        already received from this participant  *)
     if (from \in (map fst' recv_promises))
@@ -315,7 +315,7 @@ Definition step_recv (s : StateT) (from : nid) (mtag : ttag) (p: proposal)
     (* Save result *)
     else if mtag == nack_resp
          then (e, PAbort) (* Abort if we see nack *)
-         else (e, PWaitPrepResponse ((from, mtag == promise_resp, mbody) :: recv_promises) p')
+         else (e, PWaitPrepResp ((from, mtag == promise_resp, mbody) :: recv_promises) p')
 (** ??
 Do I need to add receive transition for PWaitPrepResp -> PSentAcceptReq?
 The state change is in step_send but it's a receive transition that causes the state
@@ -427,13 +427,13 @@ Definition send_prepare_req_trans : send_trans PaxosCoh :=
   @node_send_trans prepare_req send_prepare_req_prec.
 
 (* Send accept request transition *)
-Definition send_acc_req_prec (p: StateT) (m: payload) :=
+Definition send_accept_req_prec (p: StateT) (m: payload) :=
   (exists n promises psal,
-    [/\ p = (n, PWaitPrepResponse promises psal),
+    [/\ p = (n, PWaitPrepResp promises psal),
      perm_eq (map fst' promises) acceptors & all (fun r => r) (map snd' promises)]).
 
-Definition send_acc_req_trans : send_trans PaxosCoh :=
-  @node_send_trans accept_req send_acc_req_prec.
+Definition send_accept_req_trans : send_trans PaxosCoh :=
+  @node_send_trans accept_req send_accept_req_prec.
 
 Definition proposal_gt (p p': proposal): Prop :=
   let: p_no := head 0 p in
@@ -490,7 +490,7 @@ Definition msg_wf d (_ : PaxosCoh d) (this from : nid) :=
 Definition receive_prepare_req_trans := recv_trans prepare_req msg_wf.
 
 (* Got accept request *)
-Definition receive_acc_req_trans := recv_trans accept_req msg_wf.
+Definition receive_accept_req_trans := recv_trans accept_req msg_wf.
 
 (* Got promise response *)
 Definition receive_promise_resp_trans := recv_trans promise_resp msg_wf.
@@ -510,7 +510,7 @@ Variable l : Label.
 Definition paxos_sends :=
   [::
      send_prepare_req_trans;
-     send_acc_req_trans;
+     send_accept_req_trans;
      send_promise_resp_trans;
      send_nack_resp_trans
   ].
@@ -519,7 +519,7 @@ Definition paxos_sends :=
 Definition paxos_receives :=
   [::
      receive_prepare_req_trans;
-     receive_acc_req_trans;
+     receive_accept_req_trans;
      receive_promise_resp_trans;
      receive_nack_resp_trans
   ].
@@ -536,12 +536,12 @@ Section Exports.
 Definition PaxosProtocol := PaxosProtocol.
 
 Definition send_prepare_req_trans := send_prepare_req_trans.
-Definition send_acc_req_trans := send_acc_req_trans.
+Definition send_accept_req_trans := send_accept_req_trans.
 Definition send_promise_resp_trans := send_promise_resp_trans.
 Definition send_nack_resp_trans := send_nack_resp_trans.
 
 Definition receive_prepare_req_trans := receive_prepare_req_trans.
-Definition receive_acc_req_trans := receive_acc_req_trans.
+Definition receive_accept_req_trans := receive_accept_req_trans.
 Definition receive_promise_resp_trans := receive_promise_resp_trans.
 Definition receive_nack_resp_trans := receive_nack_resp_trans.
 

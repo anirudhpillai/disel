@@ -21,7 +21,7 @@ let usage msg =
   print_endline "Options are as follows:";
   print_endline "    -me <NAME>           the identity of this node (required)";
   print_endline "    -mode <MODE>         whether this node is the proposer or acceptor (required)";
-  print_endline "    -coordinator <NAME>  the identity of the proposer (required if mode=proposer)";
+  print_endline "    -proposer <NAME>  the identity of the proposer (required if mode=client)";
   exit 1
 
 
@@ -54,20 +54,22 @@ let rec parse_args = function
   | arg :: args ->
      usage ("Unknown argument " ^ arg)
 
+
 let main () =
   parse_args (List.tl (Array.to_list Sys.argv));
   match !mode, !me with
-  | Some mode, Some me -> begin
-     Shim.setup { nodes = !nodes; me = me; st = SimplePaxosApp.init_state };
-     match mode with
-     | Acceptor ->
+  | Some mode, Some me ->
+    begin
+      Shim.setup { nodes = !nodes; me = me; st = SimplePaxosApp.init_state };
+      match mode with
+      | Acceptor ->
         begin match int_of_nat me with
           | 1 -> SimplePaxosApp.a_runner1 ()
           | 2 -> SimplePaxosApp.a_runner2 ()
           | 3 -> SimplePaxosApp.a_runner3 ()
           | n -> usage ("unknown participant name " ^ string_of_int n)
         end
-     | Proposer ->
+      | Proposer ->
         try
           SimplePaxosApp.p_runner ()
         with _ -> print_endline "An acceptor closed its connection. Proposer exiting."

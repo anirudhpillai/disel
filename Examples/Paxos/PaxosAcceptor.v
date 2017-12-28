@@ -31,7 +31,22 @@ Notation W := (mkWorld paxos).
 Section AcceptorImplementation.
 
 (************** Atomic actions **************)
+(* Two send-actions, e -- id of the current era *)
+Program Definition send_promise_resp psal to :=
+  act (@send_action_wrapper W paxos a l (prEq paxos)
+       (send_promise_resp_trans proposers acceptors) _ psal to).
+Next Obligation.
+  rewrite !InE. right. right. left. done.
+Qed.
 
+Program Definition send_nack_resp psal to :=
+  act (@send_action_wrapper W paxos a l (prEq paxos)
+       (send_nack_resp_trans proposers acceptors) _ psal to).
+Next Obligation.
+  rewrite !InE. right. right. right. done.
+Qed.  
+
+  
 (* Two receive-actions *)
 Program Definition tryrecv_prepare_req := act (@tryrecv_action_wrapper W a
       (fun k _ t b => (k == l) && (t == prepare_req)) _).
@@ -45,19 +60,6 @@ Program Definition tryrecv_accept_req :=
 Next Obligation.
   by case/andP: H=>/eqP->_; rewrite /ddom gen_domPt inE/=.
 Qed.
-
-(* Two send-actions, e -- id of the current era *)
-Program Definition send_promise_resp to :=
-  act (@send_action_wrapper W paxos a l (prEq paxos) (send_promise_resp_trans proposers acceptors) _ [::] to).
-Next Obligation.
-  rewrite !InE. right. right. left. done.
-Qed.
-
-Program Definition send_nack_resp to :=
-  act (@send_action_wrapper W paxos a l (prEq paxos) (send_nack_resp_trans proposers acceptors) _ [::] to).
-Next Obligation.
-  rewrite !InE. right. right. right. done.
-Qed.  
 
 
 (************** Acceptor code **************)
@@ -142,6 +144,12 @@ Definition read_promised_number (rs: RoleState) :=
   | _ => 0
   end.
 
+Definition read_promised_value (rs: RoleState) :=
+  match rs with
+  | APromised psal => last 0 psal
+  | _ => 0
+  end.
+
 (* Step 2: Respond promise or nack to the proposer *)
 Program Definition resp_to_prepare_req (e: nat) (prepare_no: nat):
   {(pinit pfinal: proposal)}, DHT [a, W]
@@ -149,9 +157,11 @@ Program Definition resp_to_prepare_req (e: nat) (prepare_no: nat):
     fun (_ : seq nat) m => loc m = st :-> (e, APromised pinit) \/
         loc m = st :-> (e, APromised pfinal))
   := Do (rs <-- read_state;
-         if prepare_no > read_promised_number rs
-         then send_promise_resp prepare_no
-         else send_nack_resp prepare_no).
+         let: promised := read_promised_number rs in
+         let: value := read_promised_value rs in  
+         if prepare_no > promised
+         then send_promise_resp [:: promised; value] prepare_no
+         else send_nack_resp [:: 0; 0] prepare_no).
 Next Obligation.
   admit.
 Admitted.
@@ -231,7 +241,7 @@ Module Exports.
 Section Exports.
 
 Definition acceptor_round := acceptor_round.
-  
+Check acceptor_round.  
 End Exports.
 End Exports.
 

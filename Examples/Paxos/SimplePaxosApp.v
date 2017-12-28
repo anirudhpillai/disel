@@ -38,10 +38,9 @@ Definition a3 := 4.
 Definition proposers := [:: p1].
 Definition acceptors := [::a1; a2; a3].
 
-(* TODO: Figure out what [::] is needed *)
 (* Proposers *)
 Definition proposer p psal:=
-  proposer_round l proposers acceptors [::] p psal.
+  proposer_round l proposers acceptors p psal.
 
 (* Acceptors *)
 Program Definition acceptor a :=
@@ -73,23 +72,33 @@ Definition init_state : state := l \\-> init_dstatelet.
 (* Final Safety Facts *)
 Notation W := (mkWorld (PaxosProposer.paxos l proposers acceptors)).
 
+Lemma hook_complete_unit (c : context) : hook_complete (c, Unit).
+Proof. by move=>????; rewrite dom0 inE. Qed.
 
+Lemma hooks_consistent_unit (c : context) : hooks_consistent c Unit.
+Proof. by move=>????; rewrite dom0 inE. Qed.
+
+Lemma init_coh : init_state \In Coh W.
+Proof. admit. Admitted.
+
+(* [Run] Runnable proposer code *)
 Program Definition run_proposer p psal:
   DHT [p, _] (
-  fun i => network_rely W p init_state i,
-  fun _ m => exists (r : nat),
-   getLocal p (getStatelet m l) = st :-> (r, PInit psal))
-  := Do (with_inv (PaxosInductiveInv.ii _ _ _ ) (proposer p psal)).
+    fun i => network_rely W p init_state i,
+    fun _ m => exists (r : nat),
+    getLocal p (getStatelet m l) = st :-> (r, PInit psal))
+  := Do (with_inv (PaxosInductiveInv.ii _ _ _) (proposer p psal)).
 Next Obligation.
   admit.
 Admitted.
 
+(* [Run] Runnable acceptor code *)
 Program Definition run_acceptor a:
   DHT [a, _] (
-  fun i => network_rely W a init_state i,
-  fun _ m => exists (r : nat),
-   getLocal a (getStatelet m l) = st :-> (r, AInit))
-  := Do (with_inv (PaxosInductiveInv.ii _ _ _ ) (acceptor a)).
+    fun i => network_rely W a init_state i,
+    fun _ m => exists (r : nat),
+    getLocal a (getStatelet m l) = st :-> (r, AInit))
+  := Do (with_inv (PaxosInductiveInv.ii _ _ _) (acceptor a)).
 Next Obligation.
   admit.
 Admitted.

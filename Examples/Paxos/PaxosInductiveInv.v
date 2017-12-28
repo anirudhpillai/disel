@@ -53,11 +53,11 @@ Definition Phase1a (d: dstatelet) (round: nat) (n: nid): Prop :=
   (role_state d (round, AInit) n)
   \/ exists psal, (role_state d (round, PInit psal) n)
      \/ (exists sent_to, role_state d (round, PSentPrep psal sent_to) n)
-     \/ (exists promises, role_state d (round, PWaitPrepResponse promises psal) n).
+     \/ (exists promises, role_state d (round, PWaitPrepResp promises psal) n).
 
 Definition Phase1b (d: dstatelet) (round: nat) (n: nid): Prop :=
   exists psal, (role_state d (round, APromised psal) n)
-    \/ (exists promises, role_state d (round, PWaitPrepResponse promises psal) n).
+    \/ (exists promises, role_state d (round, PWaitPrepResp promises psal) n).
 
 Definition Phase2a (d: dstatelet) (round: nat) (n: nid): Prop :=
   (role_state d (round, PAbort) n)
@@ -92,7 +92,7 @@ Proof.
   admit.
 Admitted.
 
-Program Definition s2: Sinv (send_acc_req_trans proposers acceptors).
+Program Definition s2: Sinv (send_accept_req_trans proposers acceptors).
 Proof.
   admit.
 Admitted.
@@ -117,7 +117,7 @@ Proof.
   admit.
 Admitted.
 
-Program Definition r2: Rinv (receive_acc_req_trans proposers acceptors).
+Program Definition r2: Rinv (receive_accept_req_trans proposers acceptors).
 Proof.
   admit.
 Admitted.
