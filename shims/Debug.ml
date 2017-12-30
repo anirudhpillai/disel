@@ -96,3 +96,7 @@ let print_paxos_state = function
   | PaxosProtocol.PaxosProtocol.States.APromised _ -> print_endline "APromised"
   | PaxosProtocol.PaxosProtocol.States.AInit -> print_endline "AInit"
   | _ -> print_endline "state not found"
+
+let rec print_paxos_list = function
+  [] -> ()
+  | e::l -> print_int (int_of_nat e) ; print_string " " ; print_paxos_list l

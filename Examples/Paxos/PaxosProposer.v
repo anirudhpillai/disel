@@ -181,7 +181,7 @@ Program Definition check_promises recv_promises :
   (fun i => loc i = st :-> (e, PWaitPrepResp res pinit),
    fun _ m => loc m = st :-> (e, PWaitPrepResp res pinit)):=
   Do (ret _ _ (
-            (map fst' recv_promises == acceptors) &&
+            (perm_eq (map fst' recv_promises) acceptors) &&
             (all (fun i => i) (map snd' recv_promises))
      )).
 Next Obligation.

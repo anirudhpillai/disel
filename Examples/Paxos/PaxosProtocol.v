@@ -284,6 +284,8 @@ Definition step_send (s: StateT) (to : nid) (p: proposal): StateT :=
       if p_no > curr_p_no (* If promising higher number *)
       then (e, APromised p) (* Update promised number by storing new proposal *)
       else (e, APromised p') (* We'll send NACK so don't need to update *)
+    (* Promise first received transition *)
+    | AInit => (e, APromised p)
     (* Don't think I need transitions from AAccepted state *)
     | _ => (e, rs)
     end.
@@ -322,17 +324,17 @@ The state change is in step_send but it's a receive transition that causes the s
 to change not a send transition. *)
   (* Acceptor States *)
   (* Haven't promised anything so need to promise the first prepare message *)
-  | AInit => (e, APromised mbody)
+  (* | AInit => (e, APromised mbody) *)
 (** ??
 Do I need to add receive transition for APromised -> APromised when it receives
 a new prepare message? *)
-  | APromised p' =>
-    if mtag == accept_req
-    then let: curr_p_no := head 0 p' in
-         if p_no > curr_p_no
-         then (e, AAccepted mbody) (* Accept AccReq *)
-         else (e, APromised p')
-    else s (* NOTE: Can add another if statement here to check mtag == prep_req 
+  (* | APromised p' => *)
+  (*   if mtag == accept_req *)
+  (*   then let: curr_p_no := head 0 p' in *)
+  (*        if p_no > curr_p_no *)
+  (*        then (e, AAccepted mbody) (* Accept AccReq *) *)
+  (*        else (e, APromised p') *)
+  (*   else s (* NOTE: Can add another if statement here to check mtag == prep_req  *)
 and then move to APromised with a higher promised number if successful *)
   | _ => s
   end.
