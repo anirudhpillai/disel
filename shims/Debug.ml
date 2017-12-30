@@ -89,3 +89,10 @@ let print_protocol f (x : Protocols.Protocols.protocol) =
 
 let print_world f x =
   Printf.fprintf f "%a" (print_um print_ordered_sort_which_is_nat (fun _ -> print_protocol)) x
+
+(** Helpers for debugging Paxos **)
+let print_paxos_state = function
+  | PaxosProtocol.PaxosProtocol.States.PInit _ -> print_endline "PInit"
+  | PaxosProtocol.PaxosProtocol.States.APromised _ -> print_endline "APromised"
+  | PaxosProtocol.PaxosProtocol.States.AInit -> print_endline "AInit"
+  | _ -> print_endline "state not found"

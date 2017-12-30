@@ -182,10 +182,10 @@ Admitted.
 
 Definition getSt n d (C : PaxosCoh d) : StateT :=
   match find st (getLocal n d) as f return _ = f -> _ with
-    Some v => fun epf => icoerce id (idyn_val v) (cohSt C epf)
+  | Some v => fun epf => icoerce id (idyn_val v) (cohSt C epf)
   | _ => fun epf => (0, AInit)
   end (erefl _).
-
+Check getSt.
 
 (*** State Transitions ***)
 
@@ -300,11 +300,11 @@ Receive Transitions:
 Definition payload := proposal.
 
 (* Changes in the Node state triggered upon receive *)
-Definition step_recv (s : StateT) (from : nid) (mtag : ttag) (p: proposal)
-           (mbody : payload): StateT :=
+Definition step_recv (s : StateT) (from : nid) (mtag : ttag) (mbody : payload):
+  StateT :=
   let: (e, rs) := s in
-  let: p_no := head 0 p in 
-  let: p_val := last 0 p in 
+  let: p_no := head 0 mbody in 
+  let: p_val := last 0 mbody in 
   match rs with
   (* Proposer states *)
   | PWaitPrepResp recv_promises p' =>
@@ -322,7 +322,7 @@ The state change is in step_send but it's a receive transition that causes the s
 to change not a send transition. *)
   (* Acceptor States *)
   (* Haven't promised anything so need to promise the first prepare message *)
-  | AInit => (e, APromised p)
+  | AInit => (e, APromised mbody)
 (** ??
 Do I need to add receive transition for APromised -> APromised when it receives
 a new prepare message? *)
@@ -330,7 +330,7 @@ a new prepare message? *)
     if mtag == accept_req
     then let: curr_p_no := head 0 p' in
          if p_no > curr_p_no
-         then (e, AAccepted p) (* Accept AccReq *)
+         then (e, AAccepted mbody) (* Accept AccReq *)
          else (e, APromised p')
     else s (* NOTE: Can add another if statement here to check mtag == prep_req 
 and then move to APromised with a higher promised number if successful *)

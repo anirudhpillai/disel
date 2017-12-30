@@ -74,9 +74,9 @@ Notation loc i := (getLocal a (getStatelet i l)).
 Export PaxosProtocol.
 
 Program Definition read_round:
-  {(ecl : (nat * RoleState))}, DHT [a, W]
-  (fun i => loc i = st :-> ecl, 
-   fun r m => loc m = st :-> ecl /\
+  {(e: nat) (rs: RoleState)}, DHT [a, W]
+  (fun i => loc i = st :-> (e, rs), 
+   fun r m => loc m = st :-> (e, rs) /\
               exists (pf : coh (getS m)), r = (getSt a pf).1) :=
   Do (act (@skip_action_wrapper W a l paxos (prEq paxos) _
                                 (fun s pf => (getSt a pf).1))).
@@ -85,9 +85,9 @@ Next Obligation.
 Admitted.
 
 Program Definition read_state:
-  {(ecl : (nat * RoleState))}, DHT [a, W]
-  (fun i => loc i = st :-> ecl, 
-   fun r m => loc m = st :-> ecl /\
+  {(e: nat) (rs: RoleState)}, DHT [a, W]
+  (fun i => loc i = st :-> (e, rs), 
+   fun r m => loc m = st :-> (e, rs) /\
               exists (pf : coh (getS m)), r = (getSt a pf).2) :=
   Do (act (@skip_action_wrapper W a l paxos (prEq paxos) _
                                 (fun s pf => (getSt a pf).2))).
@@ -212,7 +212,6 @@ Next Obligation.
   admit.
 Admitted.
 
-
 (* Using resp_to_prepare_req 0 as a 'do nothing' transition for now.
 As 0 will never be > 0 so the acceptor won't send a promise *)
 Program Definition acceptor_round:
@@ -234,6 +233,7 @@ Next Obligation.
   admit.
 Admitted.
 
+
 End AcceptorImplementation.
 End PaxosAcceptor.
 
@@ -241,7 +241,7 @@ Module Exports.
 Section Exports.
 
 Definition acceptor_round := acceptor_round.
-Check acceptor_round.  
+
 End Exports.
 End Exports.
 

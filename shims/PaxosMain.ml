@@ -64,10 +64,10 @@ let main () =
       match mode with
       | Acceptor ->
         begin match int_of_nat me with
-          | 1 -> SimplePaxosApp.a_runner1 ()
-          | 2 -> SimplePaxosApp.a_runner2 ()
-          | 3 -> SimplePaxosApp.a_runner3 ()
-          | n -> usage ("unknown participant name " ^ string_of_int n)
+          | 2 -> SimplePaxosApp.a_runner1 ()
+          | 3 -> SimplePaxosApp.a_runner2 ()
+          | 4 -> SimplePaxosApp.a_runner3 ()
+          | n -> usage ("unknown acceptor name " ^ string_of_int n)
         end
       | Proposer ->
         try
