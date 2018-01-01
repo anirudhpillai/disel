@@ -181,15 +181,12 @@ Definition r_acc_req_inv (e : nat) (psal: proposal) : cont (option proposal) :=
 (* Loops until it receives a prepare req *)
 Program Definition receive_acc_req_loop (e : nat):
   {(pinit: proposal)}, DHT [a, W]
-   (fun i => loc i = st :-> (e, AInit) \/
-             loc i = st :-> (e, APromised),
-   fun res m => exists psal, res = Some psal /\ (
-                               loc m = st :-> (e, AInit) \/
-                               loc m = st :-> (e, APromised psal) \/
-                               loc m = st :-> (e, AAccepted psal)
-                             )
-  )
-  :=
+  (fun i => loc i = st :-> (e, AInit) \/ loc i = st :-> (e, APromised),
+  fun res m => exists psal, res = Some psal /\ (
+    loc m = st :-> (e, AInit) \/
+    loc m = st :-> (e, APromised psal) \/
+    loc m = st :-> (e, AAccepted psal)
+  )) :=
   (* TODO: Check the functional construct formed by r_prepare_req_in *)
   Do _ (@while a W _ _ r_acc_req_cond (r_acc_req_inv e) _
         (fun _ => Do _ (
@@ -216,9 +213,12 @@ Admitted.
 As 0 will never be > 0 so the acceptor won't send a promise *)
 Program Definition acceptor_round:
   {(e: nat) (psal: proposal)}, DHT [a, W] 
-  (fun i =>  loc i = st :-> (e, AInit) \/ loc i = st :-> (e, APromised psal),
-   fun (_ : unit) m => loc m = st :-> (e, APromised psal) \/ loc m = st :-> (e, AInit))
-  := 
+  (fun i => loc i = st :-> (e, AInit) \/ loc i = st :-> (e, APromised psal),
+   fun (_: unit) m => (
+     loc m = st :-> (e, AInit) \/
+     loc m = st :-> (e, APromised psal) \/
+     loc m = st :-> (e, AAccepted psal)
+  )) :=
     Do _ (e <-- read_round;
           msg <-- receive_prepare_req_loop e;
           (match msg with

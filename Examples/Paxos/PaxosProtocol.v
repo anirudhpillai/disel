@@ -82,10 +82,7 @@ Definition accept_req : nat := 3.
 Definition ttag := nat.
 
 Definition tags : seq ttag :=
-  [:: prepare_req;
-     promise_resp;
-     nack_resp;
-     accept_req].
+  [:: prepare_req; promise_resp; nack_resp; accept_req].
 
 
 (*** Defining Coherence ***)
@@ -98,10 +95,7 @@ local state and message soup and then combine them to create PaxosCoh.
  *)
 
 
-(** ??
-Don't know how this function works and how reading from the heap works.
-localCoh constraints the local state of each node.
-*)
+(** localCoh constraints the local state of each node. **)
 Definition localCoh (n : nid) : Pred heap :=
   [Pred h | valid h /\ exists (s : StateT), h = st :-> s].
 
@@ -234,59 +228,38 @@ Definition snd' (tup: (nat * bool * proposal)%type): bool :=
   | (x, b, props) => b
   end.
 
+
+(**
+Step Functions
+
+Step function dictactes how the state of the node changes 
+after performing the send/receive transitions.
+*)
+
 (**
 Send Transitions:
 - Proposer: sPrep, sAccReq
 - Acceptor: sPromise, sNack
 *)
 
-(**
-Step function dictactes how the state of the node changes 
-after performing the send transition.
- *)
-
 (* Changes in the Node state triggered upon send *)
 Definition step_send (s: StateT) (to : nid) (p: proposal): StateT :=
     let: (e, rs) := s in
     match rs with
-    (* Proposer state transitions *)
     | PInit p' =>
-      if acceptors == [:: to]
+      if acceptors == [:: to] (* if only one acceptor *)
       then (e, PWaitPrepResp [::] p')
       else (e, PSentPrep [:: to] p')
-    (* Sending prepare messages *)
     | PSentPrep tos p' =>
-      (* Do not duplicate prepare-requests *)
       if perm_eq (to :: tos) acceptors
-      (* If all sent, switch to the receiving state *)
-      then (e, PWaitPrepResp [::] p')
+      (* If all prepare reqs sent *)
+      then (e, PWaitPrepResp [::] p') (* switch to the receiving state *)
       else (e, PSentPrep (to :: tos) p') (* Keep sending *)
-    (* Waiting for promises *)
-    | PWaitPrepResp recv_promises p' =>
-      (* If majority (all promises) received *)
-      if (perm_eq (map fst' recv_promises) acceptors)
-      then if all (fun r => r) (map snd' recv_promises) (* If no nacks *)
-           then let: new_p := create_proposal_for_acc_req recv_promises p' in
-                (e, PSentAccReq [:: to] new_p)
-           else (e, PAbort) (* Nack recieved so abort *)
-      else (e, rs) (* Keep waiting *)
-    (* Sending Accept Request *)
     | PSentAccReq tos p' =>
       if perm_eq (to :: tos) acceptors
-      then (e, PAbort) (* Finished sending accept requests *)
+      (* If all accept reqs sent *)
+      then (e, PAbort)
       else (e, PSentAccReq (to :: tos) p') (* Keep sending *)
-    (* Acceptor state transitions *)
-    | APromised p' =>
-      let: p_no := head 0 p in 
-      let: p_val := last 0 p in
-      let: curr_p_no := head 0 p' in 
-      let: curr_p_val := last 0 p' in
-      if p_no > curr_p_no (* If promising higher number *)
-      then (e, APromised p) (* Update promised number by storing new proposal *)
-      else (e, APromised p') (* We'll send NACK so don't need to update *)
-    (* Promise first received transition *)
-    | AInit => (e, APromised p)
-    (* Don't think I need transitions from AAccepted state *)
     | _ => (e, rs)
     end.
 
@@ -308,40 +281,40 @@ Definition step_recv (s : StateT) (from : nid) (mtag : ttag) (mbody : payload):
   let: p_no := head 0 mbody in 
   let: p_val := last 0 mbody in 
   match rs with
-  (* Proposer states *)
   | PWaitPrepResp recv_promises p' =>
-    (* All responses already collected or 
-       already received from this participant  *)
-    if (from \in (map fst' recv_promises))
-    then s
-    (* Save result *)
+    if (from \in (map fst' recv_promises)) (* If duplicate *)
+    then s (* then ignore *)
     else if mtag == nack_resp
          then (e, PAbort) (* Abort if we see nack *)
-         else (e, PWaitPrepResp ((from, mtag == promise_resp, mbody) :: recv_promises) p')
-(** ??
-Do I need to add receive transition for PWaitPrepResp -> PSentAcceptReq?
-The state change is in step_send but it's a receive transition that causes the state
-to change not a send transition. *)
-  (* Acceptor States *)
-  (* Haven't promised anything so need to promise the first prepare message *)
-  (* | AInit => (e, APromised mbody) *)
-(** ??
-Do I need to add receive transition for APromised -> APromised when it receives
-a new prepare message? *)
-  (* | APromised p' => *)
-  (*   if mtag == accept_req *)
-  (*   then let: curr_p_no := head 0 p' in *)
-  (*        if p_no > curr_p_no *)
-  (*        then (e, AAccepted mbody) (* Accept AccReq *) *)
-  (*        else (e, APromised p') *)
-  (*   else s (* NOTE: Can add another if statement here to check mtag == prep_req  *)
-and then move to APromised with a higher promised number if successful *)
+         else
+           let: r_promises := (from, mtag == promise_resp, mbody) :: recv_promises in
+           (* if all promises received, we know we don't have nacks *)
+           if (perm_eq (map fst' r_promises) acceptors)
+           then let: new_p := create_proposal_for_acc_req r_promises p' in
+                (e, PSentAccReq [::] new_p)
+           else (e, PWaitPrepResp r_promises p') (* keep waiting for promises *)
+  | AInit => (* Promise/Accept first received transition *)
+    if mtag == prepare_req
+    then (e, APromised mbody)
+    else (e, AAccepted mbody)
+  | APromised p' =>
+      let: curr_p_no := head 0 p' in 
+      let: curr_p_val := last 0 p' in
+      if mtag == prepare_req
+      then if p_no > curr_p_no (* If received higher number *)
+           (* Update promised number by storing new proposal *)
+           then (e, APromised mbody)
+           else (e, APromised p')
+      else (* It's an accept request *)
+           if p_no > curr_p_no (* If received higher number *)
+           then (e, AAccepted mbody) (* Accept the proposal *)
+           else (e, APromised p') (* we'll send nack *)
   | _ => s
   end.
 
 (* 
 There should be 4 send-transitions for the node:
-- send-prepare
+- send-prepare-request
 - send-accept-request
 - send-promise
 - send-nack
@@ -349,7 +322,7 @@ There should be 4 send-transitions for the node:
 There should be 4 receive-transitions for the node:
 - receive-promise
 - receive-nack
-- receive-prepare
+- receive-prepare-request
 - receive-accept-request
  *)
 
@@ -420,6 +393,9 @@ End GenericSendTransitions.
 
 Section SendTransitions.
 
+
+(** TODO: Strengthen all pre conditions by putting conditions on (to: nid) **)
+  
 (* Send prepare request transition *)
 Definition send_prepare_req_prec (p: StateT) (m: payload) :=
   (exists n psal, p = (n, PInit psal)) \/
@@ -430,32 +406,21 @@ Definition send_prepare_req_trans : send_trans PaxosCoh :=
 
 (* Send accept request transition *)
 Definition send_accept_req_prec (p: StateT) (m: payload) :=
-  (exists n promises psal,
-    [/\ p = (n, PWaitPrepResp promises psal),
-     perm_eq (map fst' promises) acceptors & all (fun r => r) (map snd' promises)]).
+  (exists n psal, p = (n, PSentAccReq [::] psal)).
 
 Definition send_accept_req_trans : send_trans PaxosCoh :=
   @node_send_trans accept_req send_accept_req_prec.
 
-Definition proposal_gt (p p': proposal): Prop :=
-  let: p_no := head 0 p in
-  let: p_no' := head 0 p in
-  p_no > p_no'.
-
 (* Send promise response transition *)
-(* received proposal in message must have higher number than current proposal *)
 Definition send_promise_resp_prec (p: StateT) (m: payload) :=
-  (exists n, p = (n, AInit)) \/
-  (exists n psal, p = (n, APromised psal) \/ proposal_gt m psal).
+  (exists n, p = (n, AInit)) \/ (exists n psal, p = (n, APromised psal)).
 
 Definition send_promise_resp_trans : send_trans PaxosCoh :=
   @node_send_trans promise_resp send_promise_resp_prec.
 
 (* Send nack response transition *)
-(* received proposal in message must have lower number than current proposal *)
 Definition send_nack_resp_prec (p: StateT) (m: payload) :=
-  (exists n, p = (n, AInit)) \/
-  (exists n psal, p = (n, APromised psal) \/ not (proposal_gt m psal)).
+  exists n psal, p = (n, APromised psal).
 
 Definition send_nack_resp_trans : send_trans PaxosCoh :=
   @node_send_trans nack_resp send_nack_resp_prec.
