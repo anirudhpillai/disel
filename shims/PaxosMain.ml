@@ -64,15 +64,27 @@ let main () =
       match mode with
       | Acceptor ->
         begin match int_of_nat me with
-          | 2 -> SimplePaxosApp.a_runner1 ()
-          | 3 -> SimplePaxosApp.a_runner2 ()
-          | 4 -> SimplePaxosApp.a_runner3 ()
-          | n -> usage ("unknown acceptor name " ^ string_of_int n)
+        | 3 -> SimplePaxosApp.a_runner1 ()
+        | 4 -> SimplePaxosApp.a_runner2 ()
+        | 5 -> SimplePaxosApp.a_runner3 ()
+        | n -> usage ("unknown acceptor name " ^ string_of_int n)
         end
       | Proposer ->
-        try
-          SimplePaxosApp.p_runner ()
-        with _ -> print_endline "An acceptor closed its connection. Proposer exiting."
+        begin match int_of_nat me with
+        | 1 ->
+          begin
+            try
+              SimplePaxosApp.p_runner1 ()
+            with _ -> print_endline "A acceptor closed its connection, proposer exiting."
+          end
+        | 2 ->
+          begin
+            try
+              SimplePaxosApp.p_runner2 ()
+            with _ -> print_endline "A acceptor closed its connection, proposer exiting."
+          end
+        | n -> usage ("unknown proposer name " ^ string_of_int n)
+        end
     end
   | _, _ -> usage "-mode and -me must be given"
 
