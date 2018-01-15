@@ -50,23 +50,36 @@ Definition EverythingInit (d : dstatelet) (round : nat): Prop :=
 
 (* Phase One *)
 Definition Phase1a (d: dstatelet) (round: nat) (n: nid): Prop :=
-  (role_state d (round, AInit) n)
-  \/ exists psal, (role_state d (round, PInit psal) n)
-     \/ (exists sent_to, role_state d (round, PSentPrep psal sent_to) n)
-     \/ (exists promises, role_state d (round, PWaitPrepResp promises psal) n).
+  if n \in acceptors
+  then role_state d (round, AInit) n
+  else (
+    exists psal, (role_state d (round, PInit psal) n)
+    \/ (exists sent_to, role_state d (round, PSentPrep psal sent_to) n)
+    \/ (exists promises, role_state d (round, PWaitPrepResp promises psal) n)
+  ).
 
 Definition Phase1b (d: dstatelet) (round: nat) (n: nid): Prop :=
-  exists psal, (role_state d (round, APromised psal) n)
-    \/ (exists promises, role_state d (round, PWaitPrepResp promises psal) n).
+  if n \in acceptors
+  then exists psal, role_state d (round, APromised psal) n
+  else exists psal,
+    exists promises, role_state d (round, PWaitPrepResp promises psal) n.
 
 Definition Phase2a (d: dstatelet) (round: nat) (n: nid): Prop :=
-  (role_state d (round, PAbort) n)
-  \/ exists psal, (role_state d (round, APromised psal) n)
-     \/ (exists sent_to, role_state d (round, PSentAccReq sent_to psal) n).
+  if n \in acceptors
+  then (
+    role_state d (round, PAbort) n
+    \/ exists psal, (role_state d (round, APromised psal) n)
+  )
+  else exists psal,
+    exists sent_to, role_state d (round, PSentAccReq sent_to psal) n.
 
 Definition Phase2b (d: dstatelet) (round: nat) (n: nid): Prop :=
-  (role_state d (round, PAbort) n)
-  \/ exists psal, (role_state d (round, AAccepted psal) n).
+  if n \in acceptors
+  then exists psal, (
+    role_state d (round, AAccepted psal) n \/
+    forall a, a \in acceptors -> role_state d (round, AAccepted psal) a
+  )
+  else role_state d (round, PAbort) n.
 
 (* TODO: Fix the conditions. This Inv currently isn't checking for anything. *)
 Definition Inv (d: dstatelet) :=
