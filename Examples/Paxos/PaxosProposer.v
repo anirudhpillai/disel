@@ -21,8 +21,10 @@ Section PaxosProposer.
 
 Variable l : Label.
 Variables (proposers: seq nid) (acceptors: seq nid).
-
 Variable p: nid.
+
+(* Hypothesis AcptrsNonEmpty : acceptors != [::]. *)
+(* Hypothesis HPin: p \in proposers. *)
 
 Check PaxosProtocol.
 
@@ -75,15 +77,18 @@ Notation getS s := (getStatelet s l).
 Notation loc i := (getLocal p (getStatelet i l)).
 
 Export PaxosProtocol.
-
+Check act_rule.
 Program Definition read_round:
-  {(e: nat) (rs: RoleState)}, DHT [p, W]
-  (fun i => loc i = st :-> (e, rs), 
-   fun r m => loc m = st :-> (e, rs) /\
+  {(s: StateT)}, DHT [p, W]
+  (fun i => loc i = st :-> s, 
+   fun r m => loc m = st :-> s /\
               exists (pf : coh (getS m)), r = (getSt p pf).1) :=
   Do (act (@skip_action_wrapper W p l paxos (prEq paxos) _
                                 (fun s pf => (getSt p pf).1))).
 Next Obligation.
+  apply: ghC.
+  move => s st s_is_st s_in_coh_w.
+  apply: act_rule.
   admit.
 Admitted.
 
@@ -116,6 +121,22 @@ Program Definition send_prepare_req_loop e (psal: proposal):
                   | [::] => ret _ _ tt
                   end)) acceptors).
 Next Obligation.
+  apply: ghC => i1 p'.
+  case=>[[E1 P1 C1]].
+  (* - case: to_send P1=>[|to tos Hp]. *)
+  (* case => s_init. *)
+  
+  (* case => tosend_eq_acc s_in_coh_w. *)
+  
+  (* - case: to_send tosend_eq_acc. *)
+  (*   (* + by move/perm_eq_size=>/=/size0nil=>Z; rewrite Z in (AcptrsNonEmpty). *) *)
+  (* - move => to tos perm_eq_acptrs. *)
+  (*   apply: step. *)
+  (*   apply: act_rule => j1 R1 /=. split=>[|r k m[Sf]St R2]. *)
+  (*   split=>//=; first by case: (rely_coh R1). *)
+  (*   split. *)
+  (*   split. *)
+  (*   (* + split; first by split=>//; move/perm_eq_mem: perm_eq_acptrs->; rewrite inE eqxx. *) *)
   admit.
 Admitted.
 Next Obligation.
@@ -162,11 +183,34 @@ Next Obligation.
   by move:H; rewrite /rc_prepare_resp_inv (rely_loc' _ H0).
 Qed.
 Next Obligation.
+  move => i [psal] /= [H1 I1].
+  apply: step.
+  apply: act_rule=>j R1/=; split; first by case: (rely_coh R1).
+  case=>[[[from tg] body] k m|k m]; last first.
+  - case=>Sf []Cj[]H; last by case: H=>[?][?][?][?][?][?][].
+    have E: k = j by case: H.
+    move: H. subst k=>_ R2. apply: ret_rule.
+    move => m' R3.
+    move => x [] cond.
+    rewrite /rc_prepare_resp_inv.
+    by rewrite -(rely_loc' _ R1)-(rely_loc' _ R2)-(rely_loc' _ R3).
+  case=>Sf []Cj[]=>[|[l'][mid][tms][from'][rt][pf][][E]Hin E1 Hw/=]; first by case.
+  case/andP=>/eqP Z G->{k}[]Z1 Z2 Z3 R2; subst l' from' tg body.
+  move: rt pf (coh_s (w:=W) l (s:=j) Cj) Hin R2 E1 Hw G E; rewrite prEq/=.
+  move=>rt pf Cj' Hin R E1 Hw G E.
+  have D: rt = receive_prepare_req_trans _ _.
+  (* - case: Hin G=>/=; first by intuition. *)
+  (*   case.  *)
+  (*     by intuition. *)
+  admit.
   admit.
 Admitted.
 Next Obligation.
-  admit.
-Admitted.
+  apply: ghC=>i pinit E1 C1.
+  have Pre: rc_prepare_resp_inv e pinit [::] i by rewrite /rc_prepare_resp_inv/= E1.
+  apply: call_rule'=>[|acc m]; first by exists pinit.
+  case/(_ pinit Pre)=>/=H1 H2 Cm; split=>//;  by move/negbNE: H1.
+Qed.
 
 Definition read_res (st : StateT) :=
   let: (_, rs) := st in
@@ -257,6 +301,9 @@ Program Definition proposer_round (psal: proposal):
      (* If check fails then send an acc_req for (0, 0) which will never be
         accepted by any acceptor *)
 Next Obligation.
+  move=>s0/=[e]E0; apply: step.
+  apply: (gh_ex (g := (e, PInit psal))).
+  apply: call_rule=>//e' s1 [E1][pf]->C1.
   admit.
 Admitted.
 

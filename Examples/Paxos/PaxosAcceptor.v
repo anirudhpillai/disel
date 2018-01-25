@@ -109,11 +109,24 @@ Definition r_prepare_req_inv (e : nat) (pinit: proposal): cont (option proposal)
     then loc i = st :-> (e, APromised psal)
     else loc i = st :-> (e, AInit).
 
+  (* (fun i => loc i = st :-> (e, AInit), *)
+  (*  fun res m => exists psal, res = Some psal /\ loc m = st :-> (e, APromised psal)) *)
+  (* := *)
+  (* Do _ (@while a W _ _ r_prepare_req_cond (r_prepare_req_inv e) _ *)
+  (*       (fun _ => Do _ ( *)
+  (*          r <-- tryrecv_prepare_req; *)
+  (*          match r with *)
+  (*          | Some (from, tg, body) => ret _ _ (Some body) *)
+  (*          | None => ret _ _ None *)
+  (*          end               *)
+  (*       )) None). *)
+
 (* Loops until it receives a prepare req *)
 Program Definition receive_prepare_req_loop (e : nat):
   DHT [a, W]
   (fun i => loc i = st :-> (e, AInit),
-   fun res m => exists psal, res = Some psal /\ loc m = st :-> (e, APromised psal))
+   fun res m => exists psal, res = Some psal /\
+       loc m = st :-> (e, APromised psal))
   :=
   Do _ (@while a W _ _ r_prepare_req_cond (r_prepare_req_inv e) _
         (fun _ => Do _ (
@@ -121,21 +134,40 @@ Program Definition receive_prepare_req_loop (e : nat):
            match r with
            | Some (from, tg, body) => ret _ _ (Some body)
            | None => ret _ _ None
-           end              
+           end
         )) None).
+Next Obligation. by apply: with_spec x. Defined.
+Next Obligation. by move:H; rewrite /r_prepare_req_inv (rely_loc' _ H0). Qed.
 Next Obligation.
-  by apply: with_spec x.
-Defined.
-Next Obligation.
-  by move:H; rewrite /r_prepare_req_inv (rely_loc' _ H0).
-Qed.
-Next Obligation.
-  admit.
-Admitted.
-Next Obligation.
-  admit.
-Admitted.
+  apply:ghC=>i1 psal[/eqP->{H}/=E1]C1; apply: step.
+  apply: act_rule=>i2/=R1; split; first by case: (rely_coh R1).
+  case=>[[[from e']d i3 i4]|i3 i4]; last first.
+  - case=>S/=[]?; case; last by case=>?[?][?][?][?][?][].
+    case=>_ _ Z; subst i3=>R2; apply: ret_rule=>i5 R4/=.
+    by rewrite (rely_loc' _ R4) (rely_loc' _ R2)(rely_loc' _ R1).
+  case=>Sf[]C2[]=>[|[l'][mid][tms][from'][rt][pf][][E]Hin E2 Hw/=]; first by case.
+  case/andP=>/eqP Z G->[]Z1 Z2 Z3 R2; subst l' from' e' d.
+  move: rt pf (coh_s (w:=W) l (s:=i2) C2) Hin R2 E2 Hw G E; rewrite prEq/=.
+  move=>rt pf Cj' Hin R E2 Hw G E.
+  have D: rt = receive_prepare_req_trans _ _.
+  - move: Hin G; by do! [case=>/=; first by move=>->].
+  subst rt=>{G}.
+  have P1: valid (dstate (getS i2))
+    by apply: (@cohVl _ coh); case: (Cj')=>P1 P2 P3 P4; split=>//=; done.
+  have P2: valid i2 by apply: (cohS (proj2 (rely_coh R1))).
+  have P3: l \in dom i2 by rewrite -(cohD (proj2 (rely_coh R1)))/ddom gen_domPt inE/=.
 
+  apply: ret_rule=>//i5 R4.
+  - rewrite /r_prepare_req_inv; rewrite (rely_loc' _ R4) (rely_loc' _ R) locE//=.
+    rewrite /PaxosProtocol.r_step /=.
+    rewrite -(rely_loc' _ R1) in E1.
+    (* Write getter lemmas to finish this *)
+  admit.
+Admitted.
+Next Obligation.
+  (* Can't apply ghC as no Hoare Type *)
+  admit.
+Admitted.
 
 (* Finds the promised number from current state *)
 Definition read_promised_number (rs: RoleState) :=
@@ -178,35 +210,52 @@ Definition r_acc_req_inv (e : nat) (psal: proposal) : cont (option proposal) :=
     then loc i = st :-> (e, AAccepted psal)
     else loc i = st :-> (e, AInit).
 
-(* Loops until it receives a prepare req *)
+(* Loops until it receives a accept req *)
 Program Definition receive_acc_req_loop (e : nat):
   {(pinit: proposal)}, DHT [a, W]
   (fun i => loc i = st :-> (e, AInit) \/ loc i = st :-> (e, APromised),
   fun res m => exists psal, res = Some psal /\ (
-    loc m = st :-> (e, AInit) \/
     loc m = st :-> (e, APromised psal) \/
     loc m = st :-> (e, AAccepted psal)
   )) :=
-  (* TODO: Check the functional construct formed by r_prepare_req_in *)
   Do _ (@while a W _ _ r_acc_req_cond (r_acc_req_inv e) _
         (fun _ => Do _ (
-           r <-- tryrecv_prepare_req;
+           r <-- tryrecv_accept_req;
            match r with
            | Some (from, tg, body) => ret _ _ (Some body)
            | None => ret _ _ None
            end              
         )) None).
+Next Obligation. by apply: (with_spec x). Defined.
+Next Obligation. by move:H; rewrite /r_acc_req_inv (rely_loc' _ H0). Qed.
 Next Obligation.
-  by apply: (with_spec x).
-Defined.
-Next Obligation.
-  by move:H; rewrite /r_acc_req_inv (rely_loc' _ H0).
-Qed.
-Next Obligation.
+  apply:ghC=>i1 psal [/eqP->{H}/=E1]C1. apply: step.
+  apply: act_rule=>i2/=R1; split; first by case: (rely_coh R1).
+  case=>[[[from e']v i3 i4]|i3 i4]; last first.
+  - case=>S/=[]?; case; last by case=>?[?][?][?][?][?][].
+    case=>_ _ Z; subst i3=>R2; apply: ret_rule=>i5 R4/=.
+    rewrite /r_acc_req_inv/= in E1 *.
+    by rewrite (rely_loc' _ R4) (rely_loc' _ R2) (rely_loc' _ R1).
+  case=>Sf[]C2[]=>[|[l'][mid][tms][from'][rt][pf][][E]Hin E2 Hw/=]; first by case.
+  case/andP=>/eqP Z G->[]Z1 Z2 Z3 R2; subst l' from' e' v.
+  move: rt pf (coh_s (w:=W) l (s:=i2) C2) Hin R2 E2 Hw G E; rewrite prEq/=.
+  move=>rt pf Cj' Hin R E2 Hw G E.
+  have P1: valid (dstate (getS i2))
+    by apply: (@cohVl _ coh); case: (Cj')=>P1 P2 P3 P4; split=>//=; done.
+  have P2: valid i2 by apply: (cohS (proj2 (rely_coh R1))).
+  have P3: l \in dom i2 by rewrite-(cohD (proj2 (rely_coh R1)))/ddom gen_domPt inE/=.
+  have D: rt = receive_accept_req_trans _ _.
+  -  move: Hin G. clear E1.
+     case => //. move => ->.
   admit.
 Admitted.
 Next Obligation.
+  apply: ghC=>i1 psal E1 C1/=.
+  apply: (gh_ex (g := psal)). apply: call_rule => //[r|r i2 [H1]H2 C2].
   admit.
+  rewrite /r_acc_req_cond/r_acc_req_inv in H1 H2; case: r H1 H2=>//b _ i2_AA.
+  exists b.
+  by split => //; right.
 Admitted.
 
 (* Using resp_to_prepare_req 0 as a 'do nothing' transition for now.

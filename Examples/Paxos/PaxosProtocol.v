@@ -179,7 +179,14 @@ Definition getSt n d (C : PaxosCoh d) : StateT :=
   | Some v => fun epf => icoerce id (idyn_val v) (cohSt C epf)
   | _ => fun epf => (0, AInit)
   end (erefl _).
-Check getSt.
+
+Lemma getSt_K n d (C : PaxosProtocol.PaxosCoh d) m:
+  getLocal n d = st :-> m -> getSt n C = m.
+Proof.
+rewrite /getSt/=.
+have V: valid (getLocal n d).
+admit.
+Admitted.
 
 (*** State Transitions ***)
 
