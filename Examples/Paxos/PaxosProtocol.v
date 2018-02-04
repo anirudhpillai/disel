@@ -105,31 +105,24 @@ What does tms_count do?
 Messages from Acceptor contain a Proposal/Nack
 Need to change (y : nat) to (y : Proposal)
  *)
+Definition tagFromNode (t : nat) : bool :=
+  (t \in [:: prepare_req; accept_req; promise_resp; nack_resp]).
 
-Definition tagFromAcceptor (t : nat) : bool :=
-  (t \in [:: promise_resp; nack_resp]).
-
-Definition msgFromAcceptor (tms : TaggedMessage) (y : nat) : bool :=
-    tagFromAcceptor (tag tms) && (tms_cont tms == [:: y]).
-
-Definition tagFromProposer (t : nat) : bool :=
-  (t \in [:: prepare_req; accept_req]).
-
-Definition msgFromProposer (tms : TaggedMessage) (y : nat) : Prop :=
+Definition msgFromNode (tms : TaggedMessage) (y : nat) : Prop :=
   let: body := tms_cont tms in exists data, body = y :: data.
-
 
 (* ??
 This is saying that a proposer can only send a message to an acceptor and vice versa.
 Not sure if we need to impose this for Paxos especially since we have just one 
 RoleState..
 *)
-Definition cohMsg (ms: msg TaggedMessage) (y : nat) : Prop :=
-  if from ms \in proposers
-  then to ms \in acceptors /\ msgFromProposer (content ms) y
-  else if from ms \in acceptors
-       then to ms \in proposers /\ msgFromAcceptor (content ms) y
-       else True.
+Definition cohMsg (ms: msg TaggedMessage) (y : nat) : Prop := True.
+  (* msgFromNode (content ms) y. *)
+  (* if from ms \in proposers *)
+  (* then to ms \in acceptors /\ msgFromProposer (content ms) y *)
+  (* else if from ms \in acceptors *)
+  (*      then to ms \in proposers /\ msgFromAcceptor (content ms) y *)
+  (*      else True. *)
 
 (** ??
 Coherence for the message soup.
@@ -163,6 +156,23 @@ Definition PaxosCoh := CohPred (CohPredMixin l1 l2 l3).
 
 
 (* TODO: Transition Lemmas *)
+Lemma send_soupCoh d m : 
+    soupCoh (dsoup d) -> (exists y, cohMsg m y) -> soupCoh (post_msg (dsoup d) m).1.
+Proof.
+  move=>[H1 H2][y]Cm; split=>[|i ms/=]; first by rewrite valid_fresh.
+  rewrite findUnL; last by rewrite valid_fresh.
+  case: ifP=>E; first by move/H2.
+    by move/um_findPt_inv=>[Z G]; subst i m; exists y.
+Qed.
+
+Lemma trans_updDom this d s :
+  this \in nodes -> PaxosCoh d -> dom (upd this s (dstate d)) =i nodes.
+Proof.
+  move=>D C z; rewrite -(cohDom C) domU inE/=.
+    by case: ifP=>///eqP->{z}; rewrite (cohDom C) D; apply: cohVl C.
+Qed.
+
+
 
 (* TODO: Getter lemmas for local state *)
 
@@ -346,6 +356,10 @@ Variable ptag : ttag.
 (* Precondition -- this is the way one can define multiple send-transitions *)
 Variable prec : StateT -> payload -> Prop.
 
+Hypothesis node_prec_safe :
+  forall this to s m,
+    Hin this to -> prec s m -> cohMsg (Msg (TMsg ptag m) this to true) s.1.
+
 (* Making sure that the precondition is legit *)
 Lemma this_in this to : Hin this to -> this \in nodes.
 Proof.
@@ -383,15 +397,34 @@ Definition node_step (this to : nid) (d : dstatelet)
 Lemma node_step_coh : s_step_coh_t coh ptag node_step.
 Proof.
   move=>this to d msg pf h[]->{h}.
-  admit.
-Admitted.
+  have C : (coh d) by case: pf=>?[?][].
+  split=>/=.
+  - apply: send_soupCoh; first by case:(node_safe_coh pf).
+    exists (getSt this C).1.
+    case: (pf)=> H[C']P /=. move: (conj H P)=>pf'.
+    move: P.
+    case => H2 P.
+    move: (node_prec_safe H P). rewrite (proof_irrelevance C H2)/=. done.
+  - by apply: trans_updDom=>//; case: (node_safe_in pf).
+  - by rewrite validU; apply: cohVl C.
+  move=>n Ni. rewrite /localCoh/=.  
+  rewrite /getLocal/=findU; case: ifP=>B; last by case: C=>_ _ _/(_ n Ni).
+  move/eqP: B=>Z; subst n=>/=.
+  rewrite (cohVl C)/=; split=>//.
+  move: (step_send _ _ _)=>ps.
+  rewrite ?hvalidPtUn//; last by eexists _.
+Qed.
 
 Lemma node_safe_def this to d msg :
       node_safe this to d msg <->
       exists b pf, @node_step this to d msg pf = Some b.
 Proof.
-  admit.
-Admitted.
+  split=>[pf/=|]; last by case=>?[]. 
+  set b := let C := node_safe_coh pf in 
+         let s := getSt this C in
+         mkLocal (step_send s to msg). 
+  by exists b, pf.
+Qed.
 
 Definition node_send_trans :=
   SendTrans node_safe_coh node_safe_in node_safe_def node_step_coh.
@@ -408,29 +441,45 @@ Definition send_prepare_req_prec (p: StateT) (m: payload) :=
   (exists n psal, p = (n, PInit psal)) \/
   (exists n tos psal, p = (n, PSentPrep tos psal)).
 
-Definition send_prepare_req_trans : send_trans PaxosCoh :=
-  @node_send_trans prepare_req send_prepare_req_prec.
+Program Definition send_prepare_req_trans : send_trans PaxosCoh :=
+  @node_send_trans prepare_req send_prepare_req_prec _.
+Next Obligation.
+  by rewrite /cohMsg.
+Qed.
+
+
+(** TODO: The below are solved because I'm not imposing any coherence requirement
+on the message. **)
 
 (* Send accept request transition *)
 Definition send_accept_req_prec (p: StateT) (m: payload) :=
   (exists n psal, p = (n, PSentAccReq [::] psal)).
 
-Definition send_accept_req_trans : send_trans PaxosCoh :=
-  @node_send_trans accept_req send_accept_req_prec.
+Program Definition send_accept_req_trans : send_trans PaxosCoh :=
+  @node_send_trans accept_req send_accept_req_prec _.
+Next Obligation.
+  by rewrite /cohMsg.
+Qed.
 
 (* Send promise response transition *)
 Definition send_promise_resp_prec (p: StateT) (m: payload) :=
   (exists n, p = (n, AInit)) \/ (exists n psal, p = (n, APromised psal)).
 
-Definition send_promise_resp_trans : send_trans PaxosCoh :=
-  @node_send_trans promise_resp send_promise_resp_prec.
+Program Definition send_promise_resp_trans : send_trans PaxosCoh :=
+  @node_send_trans promise_resp send_promise_resp_prec _.
+Next Obligation.
+  by rewrite /cohMsg.
+Qed.
 
 (* Send nack response transition *)
 Definition send_nack_resp_prec (p: StateT) (m: payload) :=
   exists n psal, p = (n, APromised psal).
 
-Definition send_nack_resp_trans : send_trans PaxosCoh :=
-  @node_send_trans nack_resp send_nack_resp_prec.
+Program Definition send_nack_resp_trans : send_trans PaxosCoh :=
+  @node_send_trans nack_resp send_nack_resp_prec _.
+Next Obligation.
+  by rewrite /cohMsg.
+Qed.
 
 End SendTransitions.
 

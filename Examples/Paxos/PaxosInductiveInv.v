@@ -102,11 +102,24 @@ Notation PI := proof_irrelevance.
 
 Program Definition s1: Sinv (send_prepare_req_trans proposers acceptors).
 Proof.
+  move=>this to d msg S h/= Hi/=[]T G.
+  case: (S)=>[][/eqP]Z H1[C]. exists to.
+
+  (* Init state *)
+  right.
+  left.
   admit.
 Admitted.
 
 Program Definition s2: Sinv (send_accept_req_trans proposers acceptors).
 Proof.
+  move=>this to d msg S h/= Hi/=[]T G.
+  case: (S)=>[][/eqP]Z H1[C]. exists to.
+
+  (* Init state *)
+  right.
+  right.
+  left.
   admit.
 Admitted.
 
