@@ -123,6 +123,9 @@ Program Definition send_prepare_req_loop e (psal: proposal):
 Next Obligation.
   apply: ghC => i1 p'.
   case=>[[E1 P1 C1]].
+  case: (to_send)=>[|x xs]; last first.
+  apply: step.
+  apply: act_rule.
   (* - case: to_send P1=>[|to tos Hp]. *)
   (* case => s_init. *)
   
