@@ -190,14 +190,6 @@ Definition getSt n d (C : PaxosCoh d) : StateT :=
   | _ => fun epf => (0, AInit)
   end (erefl _).
 
-Lemma getSt_K n d (C : PaxosProtocol.PaxosCoh d) m:
-  getLocal n d = st :-> m -> getSt n C = m.
-Proof.
-rewrite /getSt/=.
-have V: valid (getLocal n d).
-admit.
-Admitted.
-
 (*** State Transitions ***)
 
 Fixpoint choose_highest_numbered_proposal (p: proposal) (xs: promises): proposal :=
@@ -497,6 +489,8 @@ Definition r_step : receive_step_t coh :=
 
 Lemma r_step_coh : r_step_coh_t r_wf r_tag r_step.
 Proof.
+  move=>d from this m C pf tms D F Wf T/=.
+  rewrite /r_step; case X: (this \in nodes); last first.
   admit.
 Admitted.
 

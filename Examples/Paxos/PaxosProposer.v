@@ -23,8 +23,8 @@ Variable l : Label.
 Variables (proposers: seq nid) (acceptors: seq nid).
 Variable p: nid.
 
-(* Hypothesis AcptrsNonEmpty : acceptors != [::]. *)
-(* Hypothesis HPin: p \in proposers. *)
+(* Hypothesis AcceptorsNonEmpty : acceptors != [::]. *)
+(* Hypothesis Hin: p \in proposers. *)
 
 Check PaxosProtocol.
 
@@ -77,7 +77,7 @@ Notation getS s := (getStatelet s l).
 Notation loc i := (getLocal p (getStatelet i l)).
 
 Export PaxosProtocol.
-Check act_rule.
+
 Program Definition read_round:
   {(s: StateT)}, DHT [p, W]
   (fun i => loc i = st :-> s, 
@@ -109,7 +109,7 @@ Definition send_prepare_req_loop_spec (e : nat) := forall to_send,
          loc i = st :-> (e, PSentPrep acptrs pinit) /\
          perm_eq acceptors (acptrs ++ to_send)),
      fun r m => r = tt /\ loc m = st :-> (e, PWaitPrepResp [::] pinit)).
-
+Check inE.
 Program Definition send_prepare_req_loop e (psal: proposal):
   {(pinit: proposal)}, DHT [p, W] 
   (fun i => loc i = st :-> (e, PInit pinit),
@@ -121,27 +121,25 @@ Program Definition send_prepare_req_loop e (psal: proposal):
                   | [::] => ret _ _ tt
                   end)) acceptors).
 Next Obligation.
-  apply: ghC => i1 p'.
-  case=>[[E1 P1 C1]].
+  (* apply: ghC => i1 p'. *)
+  (* case=>[E1]. *)
+  (* case=>[[P1 C1]|]. *)
+
   (* - case: to_send P1=>[|to tos Hp]. *)
-  (* case => s_init. *)
-  
-  (* case => tosend_eq_acc s_in_coh_w. *)
-  
-  (* - case: to_send tosend_eq_acc. *)
-  (*   (* + by move/perm_eq_size=>/=/size0nil=>Z; rewrite Z in (AcptrsNonEmpty). *) *)
-  (* - move => to tos perm_eq_acptrs. *)
-  (*   apply: step. *)
-  (*   apply: act_rule => j1 R1 /=. split=>[|r k m[Sf]St R2]. *)
+  (*   + by move/perm_eq_size=>/=/size0nil=>Z; rewrite Z in (AcceptorsNonEmpty). *)
+  (* - apply: step; apply:act_rule=>j1 R1/=; split=>[|r k m[Sf]St R2]. *)
   (*   split=>//=; first by case: (rely_coh R1). *)
-  (*   split. *)
-  (*   split. *)
-  (*   (* + split; first by split=>//; move/perm_eq_mem: perm_eq_acptrs->; rewrite inE eqxx. *) *)
+  (*   admit. *)
+  (*   admit. *)
+  (*   + by rewrite /Actions.filter_hooks um_filt0=>???/sym/find_some; rewrite dom0 inE. *)
+  (* case: {-1}(Sf)=>_/=[]Hc[C][]; last first. *)
+  (* admit. *)
   admit.
 Admitted.
 Next Obligation.
-  admit.
-Admitted.
+  apply:ghC=>i lg E1 _; apply: (gh_ex (g:=lg)).
+  apply: call_rule=>C1. split => //. by left. done.
+Qed.
 
 (*******************************************)
 (*** Receiving responses to the proposal ***)
