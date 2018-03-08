@@ -271,8 +271,10 @@ Program Definition acceptor_round:
     Do _ (e <-- read_round;
           msg <-- receive_prepare_req_loop e;
           (match msg with
-          | Some (cons p_no p_val) => resp_to_prepare_req e p_no
-          | _  => resp_to_prepare_req e 0
+           | Some body =>
+             let: p_no := head 4 body in
+             resp_to_prepare_req e p_no
+           | _  => resp_to_prepare_req e 6
           end);;
          receive_acc_req_loop e;;
          ret _ _ tt).

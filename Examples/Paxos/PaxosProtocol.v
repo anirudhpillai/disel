@@ -191,42 +191,6 @@ Definition getSt n d (C : PaxosCoh d) : StateT :=
   end (erefl _).
 
 (*** State Transitions ***)
-
-Fixpoint choose_highest_numbered_proposal (p: proposal) (xs: promises): proposal :=
-  let: p_no := head 0 p in 
-  let: p_val := last 0 p in 
-  match xs with
-  | cons (_, _, p') rest =>
-    let: p_no1 := head 0 p' in
-    let: p_val1 := last 0 p' in 
-    if p_no1 > p_no
-    then choose_highest_numbered_proposal [:: p_no1; p_val1] rest
-    else choose_highest_numbered_proposal [:: p_no; p_val] rest
-  | _ => p
-  end.
-
-(* Choose value of highest numbered proposal received from acceptors *)
-Fixpoint create_proposal_for_acc_req (recv_promises: promises) (p: proposal):
-  proposal :=
-  let: p_no := head 0 p in 
-  let: p_val := last 0 p in 
-  match recv_promises with
-  | cons (_, _, p') xs =>
-    let: p_no1 := head 0 p' in
-    let: p_val1 := last 0 p' in 
-    let: max_proposal := choose_highest_numbered_proposal [:: p_no1; p_val1] xs in
-    let: choosen_value := last 0 max_proposal in 
-    [:: p_no; choosen_value]
-  | nil => p
-  end.
-
-(* Test for highest numbered proposal
-Compute create_proposal_for_acc_req [:: (1, true, [:: 1; 1]);
-                                    (3, false, [:: 3; 4]);
-                                    (2, true, [:: 2; 8])
-                                    ] [:: 9; 1].
-*)
-
 Definition fst' (tup: (nat * bool * proposal)%type): nat :=
   match tup with
   | (x, b, props) => x
@@ -236,6 +200,40 @@ Definition snd' (tup: (nat * bool * proposal)%type): bool :=
   match tup with
   | (x, b, props) => b
   end.
+
+Fixpoint find_highest_numbered_promise (max_so_far: proposal) (xs: promises):
+  proposal :=
+  match xs with
+  | cons (_, check, p) rest =>
+    if check && (head 0 p > head 0 max_so_far)
+    then find_highest_numbered_promise p rest
+    else find_highest_numbered_promise max_so_far rest
+  | _ => max_so_far
+  end.
+
+(* Choose value of highest numbered proposal received from acceptors *)
+Fixpoint create_proposal_for_acc_req (xs: promises) (p: proposal): proposal :=
+  (* All promises received *)
+  if (all (fun i => i) (map snd' xs))
+  then
+    let: max_proposal := find_highest_numbered_promise [:: 0; 0] xs in
+    if perm_eq max_proposal [:: 0; 0]
+    then p
+    else [:: (head 0 p); (last 0 max_proposal)]
+  else [:: 0; 0].
+
+
+(* Test for highest numbered proposal
+Compute create_proposal_for_acc_req [:: (1, true, [:: 1; 1]);
+                                    (3, false, [:: 3; 4]);
+                                    (2, true, [:: 2; 8])
+                                    ] [:: 9; 1].
+
+Compute create_proposal_for_acc_req [:: (1, true, [:: 0; 0]);
+                                    (3, false, [:: 3; 4]);
+                                    (2, false, [:: 2; 8])
+                                    ] [:: 9; 1].
+*)
 
 
 (**

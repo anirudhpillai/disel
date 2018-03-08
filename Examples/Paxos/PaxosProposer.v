@@ -36,8 +36,8 @@ Section ProposerImplementation.
 (************** Atomic actions **************)
 
 (* Two send-actions, e -- id of the current era *)
-(* TODO: 
-- Factor in how to encode round number 
+(* TODO:
+- Factor in how to encode round number
 - Probably something like [::e; psal]?
 - Better would be to have a proposal as [round_no, p_no, p_val]
 but p_no is supposed to work as round no, need to rethink probably
@@ -80,7 +80,7 @@ Export PaxosProtocol.
 
 Program Definition read_round:
   {(s: StateT)}, DHT [p, W]
-  (fun i => loc i = st :-> s, 
+  (fun i => loc i = st :-> s,
    fun r m => loc m = st :-> s /\
               exists (pf : coh (getS m)), r = (getSt p pf).1) :=
   Do (act (@skip_action_wrapper W p l paxos (prEq paxos) _
@@ -109,31 +109,23 @@ Definition send_prepare_req_loop_spec (e : nat) := forall to_send,
          loc i = st :-> (e, PSentPrep acptrs pinit) /\
          perm_eq acceptors (acptrs ++ to_send)),
      fun r m => r = tt /\ loc m = st :-> (e, PWaitPrepResp [::] pinit)).
-Check inE.
+
 Program Definition send_prepare_req_loop e (psal: proposal):
-  {(pinit: proposal)}, DHT [p, W] 
+  {(pinit: proposal)}, DHT [p, W]
   (fun i => loc i = st :-> (e, PInit pinit),
    fun r m => r = tt /\
               loc m = st :-> (e, PWaitPrepResp [::] pinit)) :=
-  Do (ffix (fun (rec : send_prepare_req_loop_spec e) to_send => 
+  Do (ffix (fun (rec : send_prepare_req_loop_spec e) to_send =>
               Do (match to_send with
                   | to :: tos => send_prepare_req psal to ;; rec tos
                   | [::] => ret _ _ tt
                   end)) acceptors).
 Next Obligation.
-  (* apply: ghC => i1 p'. *)
-  (* case=>[E1]. *)
-  (* case=>[[P1 C1]|]. *)
-
-  (* - case: to_send P1=>[|to tos Hp]. *)
-  (*   + by move/perm_eq_size=>/=/size0nil=>Z; rewrite Z in (AcceptorsNonEmpty). *)
-  (* - apply: step; apply:act_rule=>j1 R1/=; split=>[|r k m[Sf]St R2]. *)
-  (*   split=>//=; first by case: (rely_coh R1). *)
-  (*   admit. *)
-  (*   admit. *)
-  (*   + by rewrite /Actions.filter_hooks um_filt0=>???/sym/find_some; rewrite dom0 inE. *)
-  (* case: {-1}(Sf)=>_/=[]Hc[C][]; last first. *)
-  (* admit. *)
+  apply: ghC => i1 p'.
+  case=>[[E1 P1 C1]].
+  case: (to_send)=>[|x xs]; last first.
+  apply: step.
+  apply: act_rule.
   admit.
 Admitted.
 Next Obligation.
@@ -157,7 +149,7 @@ Definition rc_prepare_resp_inv (e : nat) (psal: proposal): cont (promises) :=
 Program Definition receive_prepare_resp_loop (e : nat):
   {(pinit : proposal)}, DHT [p, W]
   (fun i => loc i = st :-> (e, PWaitPrepResp [::] pinit),
-   fun res m => 
+   fun res m =>
        loc m = st :-> (e, PWaitPrepResp res pinit) /\
        (perm_eq (map fst' res) acceptors))
   :=
@@ -166,13 +158,11 @@ Program Definition receive_prepare_resp_loop (e : nat):
            r <-- tryrecv_prepare_resp;
            match r with
            | Some (from, tg, body) =>
-             (* TODO: need to check if received msg is for this round
-               might need to change proposal to be like [e, p_no, p_val] *)
              if (from \in acceptors) && (from \notin (map fst' recv_promises))
              then ret _ _ ((from, tg == promise_resp, body) :: recv_promises)
              else ret _ _ recv_promises
            | None => ret _ _ recv_promises
-           end              
+           end
         )) [::]).
 Next Obligation.
   by apply: with_spec x.
@@ -216,19 +206,6 @@ Definition read_res (st : StateT) :=
   | PWaitPrepResp res _ => res
   | _ => [::]
   end.
-
-(* Reading the accumulated responses from the state *)
-Program Definition check_promises recv_promises :
-  {(e : nat) (pinit : proposal) res}, DHT [p, W]
-  (fun i => loc i = st :-> (e, PWaitPrepResp res pinit),
-   fun _ m => loc m = st :-> (e, PWaitPrepResp res pinit)):=
-  Do (ret _ _ (
-            (perm_eq (map fst' recv_promises) acceptors) &&
-            (all (fun i => i) (map snd' recv_promises))
-     )).
-Next Obligation.
-  admit.
-Admitted.
 
 (*******************************************)
 (***    Sending accept requests          ***)
@@ -279,11 +256,7 @@ Admitted.
 (*****************************************************)
 
 
-(* This is only ment to be run once for each proposer
-   TODO: change receive_prepare_resp_loop to get all responses and only then
-         return otherwise, it'll return after getting one resp.
-         Just need to change its invariant.
-*)
+(* This is only ment to be run once for each proposer *)
 Program Definition proposer_round (psal: proposal):
   {(e : nat)}, DHT [p, W]
   (fun i => loc i = st :-> (e, PInit psal),
@@ -292,12 +265,7 @@ Program Definition proposer_round (psal: proposal):
   Do (e <-- read_round;
       send_prepare_req_loop e psal;;
       recv_promises <-- receive_prepare_resp_loop e;
-      check <-- check_promises recv_promises;
-      if check
-      then send_accept_reqs e (choose_highest_numbered_proposal psal recv_promises)
-      else send_accept_reqs e [:: 0; 0]).
-     (* If check fails then send an acc_req for (0, 0) which will never be
-        accepted by any acceptor *)
+      send_accept_reqs e (create_proposal_for_acc_req recv_promises psal)).
 Next Obligation.
   move=>s0/=[e]E0; apply: step.
   apply: (gh_ex (g := (e, PInit psal))).
