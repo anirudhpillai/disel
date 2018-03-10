@@ -23,7 +23,7 @@ Variable l : Label.
 Variables (proposers: seq nid) (acceptors: seq nid).
 Variable p: nid.
 
-(* Hypothesis AcceptorsNonEmpty : acceptors != [::]. *)
+Hypothesis AcceptorsNonEmpty : acceptors != [::].
 (* Hypothesis Hin: p \in proposers. *)
 
 Check PaxosProtocol.
@@ -88,9 +88,17 @@ Program Definition read_round:
 Next Obligation.
   apply: ghC.
   move => s st s_is_st s_in_coh_w.
-  apply: act_rule.
-  admit.
-Admitted.
+  apply: act_rule => j R.
+  split => [|r k m].
+    by case: (rely_coh R).
+  case=>/=H1[Cj]Z.
+  subst j=>->R'.
+  split; first by rewrite (rely_loc' l R') (rely_loc' _ R).
+  case: (rely_coh R')=>_; case=>_ _ _ _/(_ l)=>/= pf; rewrite prEq in pf.
+  exists pf; move: (rely_loc' l R') =>/sym E'.
+  suff X: getSt p (Actions.safe_local (prEq paxos) H1) = getSt p pf by rewrite X.
+  by apply: (getStE pf _ E'). 
+Qed.
 
 (*******************************************)
 (***   Sending out proposals in a loop   ***)
@@ -219,7 +227,7 @@ Definition send_accept_req_loop_spec (e : nat) psal := forall to_send,
           to_send = acceptors, perm_eq (map fst' res) acceptors &
           all id (map snd' res)]) \/
       if to_send == [::]
-      then loc i = st :-> (e, PSentAccReq [::] psal)
+      then loc i = st :-> (e, PAbort)
       else exists (acptrs : seq nid),
         loc i = st :-> (e, PSentAccReq acptrs psal) /\
         perm_eq acceptors (acptrs ++ to_send),
@@ -234,6 +242,37 @@ Program Definition send_accept_req_loop e psal: send_accept_req_loop_spec e psal
            | [::] => ret _ _ tt
            end)) to_send.
 Next Obligation.
+  apply: ghC=>s1 psal' E1 C1; elim: to_send s1 E1 C1=>//=.
+  - move=>s1; case; first by case=>?[]_ Z; rewrite -Z in (AcceptorsNonEmpty).
+    move => E1 _. apply: ret_rule=>i2 R. by rewrite (rely_loc' _ R).
+  move=>to tos Hi s1 H C1.
+  apply: step; apply: act_rule=>s2 R2/=.
+  have Pre: Actions.send_act_safe W (p:=paxos) p l
+          (send_accept_req_trans proposers acceptors) [:: e] to s2.
+  - split; [by case: (rely_coh R2) | | |]; last first.
+    + by rewrite /Actions.filter_hooks um_filt0=>???/sym/find_some; rewrite dom0 inE.
+    (* Because of inE *)
+    (* + rewrite /Actions.can_send /nodes inE eqxx andbC/=. *)
+    (*     by rewrite -(cohD (proj2 (rely_coh R2)))/ddom gen_domPt inE/=. *)
+      admit.
+    case: (proj2 (rely_coh R2))=>_ _ _ _/(_ l); rewrite prEq=>C; split.
+    (* Because of inE *)  
+    (* + split=>//; case: H; first by case=>?[_]<-; rewrite inE eqxx. *)
+    (*     by case=>ps[_]/perm_eq_mem->; rewrite mem_cat orbC inE eqxx.   *)
+    admit.
+  split.
+  (* Because of inE *)  
+  admit.
+  (* Don't know why this doesn't work *)
+  admit.
+
+
+  (* Using the postcondition *)
+  split => //.
+  admit.
+  move => body i3 i4[Sf]/=St R3.
+  apply: Hi; last by case: (rely_coh R3).  
+  right; rewrite (rely_loc' _ R3).
   admit.
 Admitted.
 
@@ -245,16 +284,16 @@ Program Definition send_accept_reqs e psal:
          [/\ loc i = st :-> (e, PWaitPrepResp recv_promises pinit),
           perm_eq (map fst' recv_promises) acceptors &
           all id (map snd' recv_promises)],
-   fun (r : unit) m => loc m = st :-> (e, PSentAccReq [::] pinit))
+   fun (r : unit) m => loc m = st :-> (e, PAbort))
   := Do (send_accept_req_loop e psal acceptors).
 Next Obligation.
-  admit.
-Admitted.
+  apply: ghC=>i lg[res][H1]H2 H3 C; apply: (gh_ex (g:=lg)).
+  apply: call_rule=>//; first by move=>_; left; exists res. 
+Qed.
 
 (*****************************************************)
 (*      Full Proposer Implementation                 *)
 (*****************************************************)
-
 
 (* This is only ment to be run once for each proposer *)
 Program Definition proposer_round (psal: proposal):
@@ -270,6 +309,12 @@ Next Obligation.
   move=>s0/=[e]E0; apply: step.
   apply: (gh_ex (g := (e, PInit psal))).
   apply: call_rule=>//e' s1 [E1][pf]->C1.
+  rewrite !(getStP_K _ E1)=>{e'}.
+  apply: step; apply: (gh_ex (g := psal)).
+  apply: call_rule=>//_ s2[_]/=E2 C2.
+  apply: step; apply: (gh_ex (g:=(psal))).
+  apply: call_rule=>//res s3/= [E3 H3] C3.
+  
   admit.
 Admitted.
 

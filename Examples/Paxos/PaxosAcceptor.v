@@ -74,15 +74,26 @@ Notation loc i := (getLocal a (getStatelet i l)).
 Export PaxosProtocol.
 
 Program Definition read_round:
-  {(e: nat) (rs: RoleState)}, DHT [a, W]
-  (fun i => loc i = st :-> (e, rs), 
-   fun r m => loc m = st :-> (e, rs) /\
+  {(s: StateT)}, DHT [a, W]
+  (fun i => loc i = st :-> s,
+   fun r m => loc m = st :-> s /\
               exists (pf : coh (getS m)), r = (getSt a pf).1) :=
   Do (act (@skip_action_wrapper W a l paxos (prEq paxos) _
                                 (fun s pf => (getSt a pf).1))).
 Next Obligation.
-  admit.
-Admitted.
+  apply: ghC.
+  move => s st s_is_st s_in_coh_w.
+  apply: act_rule => j R.
+  split => [|r k m].
+    by case: (rely_coh R).
+  case=>/=H1[Cj]Z.
+  subst j=>->R'.
+  split; first by rewrite (rely_loc' l R') (rely_loc' _ R).
+  case: (rely_coh R')=>_; case=>_ _ _ _/(_ l)=>/= pf; rewrite prEq in pf.
+  exists pf; move: (rely_loc' l R') =>/sym E'.
+  suff X: getSt a (Actions.safe_local (prEq paxos) H1) = getSt a pf by rewrite X.
+  by apply: (getStE pf _ E'). 
+Qed.
 
 Program Definition read_state:
   {(e: nat) (rs: RoleState)}, DHT [a, W]

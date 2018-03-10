@@ -190,6 +190,36 @@ Definition getSt n d (C : PaxosCoh d) : StateT :=
   | _ => fun epf => (0, AInit)
   end (erefl _).
 
+
+Lemma locCn n d (C : PaxosCoh d):
+  n \in nodes -> 
+  valid (getLocal n d) /\
+  exists (s : StateT), getLocal n d = st :-> s.
+Proof.
+by case: C=>_ _ _ /(_ n)G; move: G; rewrite /localCoh/=.  
+Qed.
+
+Lemma getStE l i j pf pf' n:
+  getLocal n (getStatelet j l) = getLocal n (getStatelet i l) ->
+  @getSt n (getStatelet j l) pf' = @getSt n (getStatelet i l) pf.
+Proof.
+  admit.
+Admitted.
+
+
+Lemma getStP_K p d (C : PaxosCoh d) m:
+  getLocal p d = st :-> m -> getSt p C = m.
+Proof.
+move=>E; rewrite /getSt/=.
+(* have pf : p \in nodes by rewrite inE eqxx. *)
+(* have V: valid (getLocal cn d) by case: (locCn C pf). *)
+(* move: (cohStC C); rewrite !E=>/= H. *)
+(* by apply: ieqc. *)
+(* Qed. *)
+admit.
+Admitted.
+
+
 (*** State Transitions ***)
 Definition fst' (tup: (nat * bool * proposal)%type): nat :=
   match tup with
