@@ -73,7 +73,6 @@ Qed.
 Implicit Arguments PaxosProtocol.PaxosCoh [proposers acceptors].
 Notation coh := (@PaxosProtocol.PaxosCoh proposers acceptors).
 Notation getS s := (getStatelet s l).
-(* ?? not sure if to use p or proposers *)
 Notation loc i := (getLocal p (getStatelet i l)).
 
 Export PaxosProtocol.
@@ -145,7 +144,6 @@ Qed.
 (*** Receiving responses to the proposal ***)
 (*******************************************)
 
-(* TODO: Need to ensure ending condition and invariant are such that the loop ends only when ALL the responses have been received *)
 (* Ending condition *)
 Definition rc_prepare_resp_cond (recv_promises : promises) :=
   ~~ perm_eq (map fst' recv_promises) acceptors.
@@ -299,13 +297,13 @@ Qed.
 Program Definition proposer_round (p_init: proposal):
   {(psal: proposal) (e : nat)}, DHT [p, W]
   (fun i => loc i = st :-> (e, PInit psal),
-   fun res m => loc m = st :-> (e.+1, PAbort))
+   fun (_: unit) m => loc m = st :-> (e.+1, PAbort))
   :=
   Do (e <-- read_round;
       send_prepare_req_loop e p_init;;
       recv_promises <-- receive_prepare_resp_loop e;
       send_accept_reqs e (create_proposal_for_acc_req recv_promises p_init);;
-      ret _ _ true).
+      ret _ _ tt).
 Next Obligation.
   move=>s0/=[psal [e]] E0. apply: step.
   apply: (gh_ex (g := (e, PInit psal))).
@@ -315,8 +313,6 @@ Next Obligation.
   apply: call_rule=>//_ s2[_]/=E2 C2.
   apply: step; apply: (gh_ex (g:=psal)).
   apply: call_rule=>//res s3/= [E3 H3] C3.
-  apply: step; apply: (gh_ex (g:=e)); apply: (gh_ex (g:=d));
-  apply: (gh_ex (g:=lg)); apply: (gh_ex (g:=res)).
   admit.
 Admitted.
 

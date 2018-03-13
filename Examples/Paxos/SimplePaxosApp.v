@@ -39,9 +39,12 @@ Definition a3 := 5.
 Definition proposers := [:: p1].
 Definition acceptors := [::a1; a2; a3].
 
+(* Necessary coherence facts *)
+Fact AcceptorsNonEmpty : acceptors != [::]. Proof. by []. Qed.
+
 (* Proposers *)
-Definition proposer p psal:=
-  proposer_round l proposers acceptors p psal.
+Definition proposer p (pf: acceptors != [::]) psal:=
+  proposer_round l proposers acceptors p pf psal.
 
 (* Acceptors *)
 Program Definition acceptor a :=
@@ -83,16 +86,16 @@ Lemma init_coh : init_state \In Coh W.
 Proof. admit. Admitted.
 
 (* [Run] Runnable proposer code *)
-Program Definition run_proposer p psal:
+Program Definition run_proposer p (AcceptorsNonEmpty: acceptors != [::]) psal:
   DHT [p, _] (
     fun i => network_rely W p init_state i,
     fun _ m => exists (r : nat),
     getLocal p (getStatelet m l) = st :-> (r, PInit psal))
-  := Do (with_inv (PaxosInductiveInv.ii _ _ _) (proposer p psal)).
+  := Do (with_inv (PaxosInductiveInv.ii _ _ _) (proposer p AcceptorsNonEmpty psal)).
 Next Obligation.
   admit.
 Admitted.
-
+Check run_proposer.
 (* [Run] Runnable acceptor code *)
 Program Definition run_acceptor a:
   DHT [a, _] (
@@ -107,8 +110,8 @@ Admitted.
 Variables (psal_1 psal_2 : proposal).
 Variables (p_1 a_1 a_2 a_3: nat).
 (* [Run] Runnable nodes *)
-Program Definition run_proposer1 := run_proposer p1 psal_1.
-Program Definition run_proposer2 := run_proposer p2 psal_2.
+Program Definition run_proposer1 := run_proposer p1 AcceptorsNonEmpty psal_1.
+Program Definition run_proposer2 := run_proposer p2 AcceptorsNonEmpty psal_2.
 Program Definition run_acceptor1 := run_acceptor a_1.
 Program Definition run_acceptor2 := run_acceptor a_2.
 Program Definition run_acceptor3 := run_acceptor a_3.
