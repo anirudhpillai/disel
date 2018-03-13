@@ -315,14 +315,18 @@ Program Definition acceptor_round:
      loc m = st :-> (ep.1, APromised ep.2) \/
      loc m = st :-> (ep.1, AAccepted ep.2)
   )) :=
-    Do _ (e <-- read_round;
+     Do _ (e <-- read_round;
+          (* need to read state here as once it receives the message, 
+             it already changes state *)
+          rs <-- read_state;
           msg <-- receive_prepare_req_loop e;
-          (* TODO: once it receives the message, it already changes state *)  
           (match msg with
            | Some body =>
              let: prepare_no := head 0 body in
-             resp_to_prepare_req e prepare_no
-           | _  => resp_to_prepare_req e 0
+             let: promised_no := read_promised_number rs in
+             let: promised_val := read_promised_value rs in
+             resp_to_prepare_req e prepare_no promised_no promised_val
+           | _  => resp_to_prepare_req e 0 0 0 (* results in sending nack *)
           end);;
          rs <-- read_state;
          (match rs with
