@@ -179,20 +179,21 @@ Next Obligation.
 Admitted.
 
 (* Finds the promised number from current state *)
-Definition read_promised_number (rs: RoleState) :=
+Definition read_promised_number (rs: RoleState): nat :=
   match rs with
   | APromised psal => head 0 psal
   | _ => 0
   end.
 
-Definition read_promised_value (rs: RoleState) :=
+Definition read_promised_value (rs: RoleState): nat :=
   match rs with
   | APromised psal => last 0 psal
   | _ => 0
   end.
 
 (* Step 2: Respond promise or nack to the proposer *)
-Program Definition resp_to_prepare_req (e: nat) (prepare_no: nat):
+Program Definition resp_to_prepare_req (e: nat) (prepare_no: nat)
+  (promised_no: nat) (promised_val: nat):
   {(pif: (proposal * proposal))}, DHT [a, W]
    (fun i => loc i = st :-> (e, APromised pif.1) \/ loc i = st :-> (e, AInit),
     fun (_ : seq nat) m =>
@@ -200,10 +201,12 @@ Program Definition resp_to_prepare_req (e: nat) (prepare_no: nat):
       then loc m = st :-> (e, APromised pif.2)
       else loc m = st :-> (e, APromised pif.1))
   := Do (rs <-- read_state;
-         let: promised := read_promised_number rs in
-         let: value := read_promised_value rs in  
-         if prepare_no > promised
-         then send_promise_resp [:: promised; value] prepare_no
+         (* let: promised := read_promised_number rs in *)
+         (* let: value := read_promised_value rs in *)
+         if prepare_no > promised_no
+         (* if prepare_no > 0 *)
+         (* if 2 > promised *)
+         then send_promise_resp [:: promised_no; promised_val] prepare_no
          else send_nack_resp [:: 0; 0] prepare_no).
 Next Obligation.
   apply:ghC=>i [pinit pfinal]E1 C1.
@@ -314,11 +317,12 @@ Program Definition acceptor_round:
   )) :=
     Do _ (e <-- read_round;
           msg <-- receive_prepare_req_loop e;
+          (* TODO: once it receives the message, it already changes state *)  
           (match msg with
            | Some body =>
-             let: p_no := head 4 body in
-             resp_to_prepare_req e p_no
-           | _  => resp_to_prepare_req e 6
+             let: prepare_no := head 0 body in
+             resp_to_prepare_req e prepare_no
+           | _  => resp_to_prepare_req e 0
           end);;
          rs <-- read_state;
          (match rs with
