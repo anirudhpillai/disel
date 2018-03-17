@@ -131,8 +131,15 @@ Next Obligation.
   apply: ghC => i1 p'.
   case=>[[E1 P1 C1]].
   case: (to_send)=>[|x xs]; last first.
-  apply: step.
-  apply: act_rule.
+  apply: step; apply: act_rule => j1 R1/=; split=>[|r k m[Sf]St R2].
+  split=>//=; first by case: (rely_coh R1).
+  rewrite /node_safe.
+  split.
+  admit.
+  admit.
+  admit.
+  admit.
+  admit.
   admit.
 Admitted.
 Next Obligation.
@@ -222,8 +229,8 @@ Definition send_accept_req_loop_spec (e : nat) psal := forall to_send,
   (fun i =>
      (exists res,
          [/\ loc i = st :-> (e, PWaitPrepResp res pinit),
-          to_send = acceptors, perm_eq (map fst' res) acceptors &
-          all id (map snd' res)]) \/
+         to_send = acceptors &
+         perm_eq (map fst' res) acceptors]) \/
       if to_send == [::]
       then loc i = st :-> (e, PAbort)
       else exists (acptrs : seq nid),
@@ -279,14 +286,14 @@ cluase? *)
 Program Definition send_accept_reqs e psal:
   {(pinit: proposal)}, DHT [p, W]
   (fun i => exists recv_promises,
-         [/\ loc i = st :-> (e, PWaitPrepResp recv_promises pinit),
-          perm_eq (map fst' recv_promises) acceptors &
-          all id (map snd' recv_promises)],
+         [/\ loc i = st :-> (e, PWaitPrepResp recv_promises pinit) &
+          perm_eq (map fst' recv_promises) acceptors],
    fun (r : unit) m => loc m = st :-> (e, PAbort))
   := Do (send_accept_req_loop e psal acceptors).
 Next Obligation.
   apply: ghC=>i lg[res][H1]H2 H3 C; apply: (gh_ex (g:=lg)).
-  apply: call_rule=>//; first by move=>_; left; exists res. 
+  apply: call_rule=>//; first by move=>_; left; exists res.
+  done.
 Qed.
 
 (*****************************************************)
@@ -297,7 +304,7 @@ Qed.
 Program Definition proposer_round (p_init: proposal):
   {(psal: proposal) (e : nat)}, DHT [p, W]
   (fun i => loc i = st :-> (e, PInit psal),
-   fun (_: unit) m => loc m = st :-> (e.+1, PAbort))
+   fun (_: unit) m => loc m = st :-> (e, PAbort))
   :=
   Do (e <-- read_round;
       send_prepare_req_loop e p_init;;
@@ -313,6 +320,13 @@ Next Obligation.
   apply: call_rule=>//_ s2[_]/=E2 C2.
   apply: step; apply: (gh_ex (g:=psal)).
   apply: call_rule=>//res s3/= [E3 H3] C3.
+  - do![apply: step]; apply: (gh_ex (g:=psal)).
+    apply: call_rule =>_. exists res. split => //.
+    
+    move => s4 E4 C4.
+    apply: ret_rule => s5 R5 psal' e' E0'.
+    rewrite E0 in E0'.
+    (* How to show that e = e' and psal = psal' *)
   admit.
 Admitted.
 
