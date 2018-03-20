@@ -122,7 +122,6 @@ Qed.
 (* Ending condition *)
 Definition r_prepare_req_cond (res : option proposal) := res == None.
 
-(* ??  Do I need to check the higher proposal number according to the state? *)
 (* Invariant relates the argument and the shape of the state *)
 Definition r_prepare_req_inv (e : nat) (pinit: proposal): cont (option proposal) :=
   fun res i =>
@@ -170,7 +169,9 @@ Next Obligation.
   - rewrite /r_prepare_req_inv; rewrite (rely_loc' _ R4) (rely_loc' _ R) locE//=.
     rewrite /PaxosProtocol.r_step /=.
     rewrite -(rely_loc' _ R1) in E1.
-    (* Write getter lemmas to finish this *)
+    rewrite /step_recv.
+    
+    (* How do I finish this? I need to execute getSt *)
   admit.
 Admitted.
 Next Obligation.
@@ -201,19 +202,14 @@ Program Definition resp_to_prepare_req (e: nat) (prepare_no: nat)
       then loc m = st :-> (e, APromised pif.2)
       else loc m = st :-> (e, APromised pif.1))
   := Do (rs <-- read_state;
-         (* let: promised := read_promised_number rs in *)
-         (* let: value := read_promised_value rs in *)
          if prepare_no > promised_no
-         (* if prepare_no > 0 *)
-         (* if 2 > promised *)
          then send_promise_resp [:: promised_no; promised_val] prepare_no
          else send_nack_resp [:: 0; 0] prepare_no).
 Next Obligation.
   apply:ghC=>i [pinit pfinal]E1 C1.
   have Pre: forall i2 proposer_id, network_rely W a i i2 ->
           Actions.send_act_safe W (p:=paxos) a l
-          (* can't call read_state to find which transition to send *)
-          (if prepare_no > 0
+          (if prepare_no > promised_no
            then (
                send_promise_resp_trans proposers acceptors
            )
@@ -223,22 +219,23 @@ Next Obligation.
   - move=>i2 pid R1.
     split; first by case: (rely_coh R1).
     case: (proj2 (rely_coh R1))=>_ _ _ _/(_ l); rewrite (prEq paxos)=>C.
+
+    case: prepare_no promised_no. split=>//.
+    admit. (* write Hin *)
     admit.
-    
+    admit. (* write Hin *)
+    admit.
     (* Need inE to work *)
     (* + rewrite /Actions.can_send /nodes inE/= mem_cat Hpin orbC. *)
     (* by rewrite -(cohD (proj2 (rely_coh R1)))/ddom gen_domPt inE/= eqxx. *)
-    admit.
     by rewrite /Actions.filter_hooks um_filt0=>???/sym/find_some; rewrite dom0 inE.
-
     admit.
 Admitted.
 
-(* TODO: Check ending condition *)
+
 (* Ending condition *)
 Definition r_acc_req_cond (res : option proposal) := res == None.
 
-(* ??  Do I need to check the higher proposal number according to the state? *)
 (* Invariant relates the argument and the shape of the state *)
 Definition r_acc_req_inv (e : nat) (promised: bool) (psal: proposal): cont (option proposal) :=
   fun res i =>
@@ -335,8 +332,8 @@ Program Definition acceptor_round:
          end);;
          ret _ _ tt).
 Next Obligation.
-  (* apply:ghC=>i1[e lg]/=E1 C1;  apply: step. *)
-  (* apply: (gh_ex (g:=(e, AInit))); apply: call_rule=>//e' i2 [E2][pf]->C2. *)
+  apply: ghC => i1[e psal]/=E1 C1; apply: step.
+  apply: (gh_ex (g:=(e, AInit))); apply: call_rule=>//e' i2 [E2][pf]->C2.
   admit.
 Admitted.
 

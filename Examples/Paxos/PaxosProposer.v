@@ -36,13 +36,6 @@ Section ProposerImplementation.
 (************** Atomic actions **************)
 
 (* Two send-actions, e -- id of the current era *)
-(* TODO:
-- Factor in how to encode round number
-- Probably something like [::e; psal]?
-- Better would be to have a proposal as [round_no, p_no, p_val]
-but p_no is supposed to work as round no, need to rethink probably
-as we exit and go to PAbort instead of retrying.
- *)
 Program Definition send_prepare_req psal to :=
   act (@send_action_wrapper W paxos p l (prEq paxos)
        (send_prepare_req_trans proposers acceptors) _ psal to).
@@ -103,8 +96,6 @@ Qed.
 (***   Sending out proposals in a loop   ***)
 (*******************************************)
 
-(* ?? What's the difference between using forall here instead of just using the
-Hoare spec to universally quantify over to_send? *)
 Definition send_prepare_req_loop_spec (e : nat) := forall to_send,
   {(pinit: proposal)}, DHT [p, W]
   (fun i =>
@@ -135,10 +126,18 @@ Next Obligation.
   split=>//=; first by case: (rely_coh R1).
   rewrite /node_safe.
   split.
+  split.
+  admit. (* what does p \in nodes proposers acceptors mean? *)
   admit.
+  split.
+  admit. (* again Hin *)
+  rewrite /send_prepare_req_prec.
+  admit. (* Where do I get coherence from *)
+  (* because of inE *)
+  (* + rewrite /Actions.can_send /nodes inE eqxx andbC/=. *)
+  (*   by rewrite -(cohD (proj2 (rely_coh R1)))/ddom gen_domPt inE/=. *)
   admit.
-  admit.
-  admit.
+  by rewrite /Actions.filter_hooks um_filt0=>???/sym/find_some; rewrite dom0 inE.
   admit.
   admit.
 Admitted.
@@ -200,9 +199,7 @@ Next Obligation.
   move: rt pf (coh_s (w:=W) l (s:=j) Cj) Hin R2 E1 Hw G E; rewrite prEq/=.
   move=>rt pf Cj' Hin R E1 Hw G E.
   have D: rt = receive_prepare_req_trans _ _.
-  (* - case: Hin G=>/=; first by intuition. *)
-  (*   case.  *)
-  (*     by intuition. *)
+  - case: Hin G=>/=; first by intuition.
   admit.
   admit.
 Admitted.
@@ -266,23 +263,19 @@ Next Obligation.
     (*     by case=>ps[_]/perm_eq_mem->; rewrite mem_cat orbC inE eqxx.   *)
     admit.
   split.
-  (* Because of inE *)  
-  admit.
-  (* Don't know why this doesn't work *)
-  admit.
+  admit. (* Because of Hin *)
+  admit. (* Don't know why this doesn't work *)
 
 
-  (* Using the postcondition *)
+  (* Postcondition *)
   split => //.
-  admit.
+  admit. (* Actions.send_act_safe *)
   move => body i3 i4[Sf]/=St R3.
-  apply: Hi; last by case: (rely_coh R3).  
+  apply: Hi; last by case: (rely_coh R3).
   right; rewrite (rely_loc' _ R3).
   admit.
 Admitted.
 
-(** ?? Should this pinit be universally quantified or should it be in the exists
-cluase? *)
 Program Definition send_accept_reqs e psal:
   {(pinit: proposal)}, DHT [p, W]
   (fun i => exists recv_promises,
@@ -296,10 +289,16 @@ Next Obligation.
   done.
 Qed.
 
+Lemma equal_rounds (left_state: StateT) (right_state: StateT):
+  left_state = right_state -> fst left_state = fst right_state.
+Proof.
+  admit.
+Admitted.
+
 (*****************************************************)
 (*      Full Proposer Implementation                 *)
 (*****************************************************)
-
+Search _ (?X :-> _ = ?X :-> _).
 (* This is only ment to be run once for each proposer *)
 Program Definition proposer_round (p_init: proposal):
   {(psal: proposal) (e : nat)}, DHT [p, W]
@@ -326,7 +325,8 @@ Next Obligation.
     move => s4 E4 C4.
     apply: ret_rule => s5 R5 psal' e' E0'.
     rewrite E0 in E0'.
-    (* How to show that e = e' and psal = psal' *)
+    (* rewrite <- (equal_rounds _ _ (hcancelPtV _ E0')). *)
+    (* Found no subterm matching "(e', PInit psal').1" in the current goal. *)
   admit.
 Admitted.
 
