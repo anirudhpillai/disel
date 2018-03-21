@@ -334,6 +334,17 @@ Program Definition acceptor_round:
 Next Obligation.
   apply: ghC => i1[e psal]/=E1 C1; apply: step.
   apply: (gh_ex (g:=(e, AInit))); apply: call_rule=>//e' i2 [E2][pf]->C2.
+  apply: step.
+  apply: (gh_ex (g:=(e, AInit))). apply: call_rule=>//??[?]??.
+  apply: step.
+  apply: call_rule; last first.
+  move=>x? _ _. case: x=>a'. apply: step.
+  apply: (gh_ex (g:=([::], [::]))). apply: call_rule; last first.
+  move=>?? _ _. apply: step.
+  apply: (gh_ex (g:=(e, AInit))). apply: call_rule; last first.
+  move=>y ? _ _.
+  case: y=>//.
+  
   admit.
 Admitted.
 

@@ -173,23 +173,22 @@ Proof.
 Qed.
 
 
-
-(* TODO: Getter lemmas for local state *)
-
 (* NOTE: These are temporary, no idea what I've done here *)
 Lemma cohSt n d (C : PaxosCoh d) s:
   find st (getLocal n d) = Some s ->
   idyn_tp s = StateT.
 Proof.
-  admit.
-Admitted.
+case: (C)=> _ _ _ G; case H: (n \in nodes).
+- by move: (G _ H); case=>V'[s']->; rewrite hfindPt//=; case=><-.  
+rewrite /getLocal; rewrite -(cohDom C) in H.
+by case: dom_find H=>//->; rewrite find0E.
+Qed.
 
 Definition getSt n d (C : PaxosCoh d) : StateT :=
   match find st (getLocal n d) as f return _ = f -> _ with
   | Some v => fun epf => icoerce id (idyn_val v) (cohSt C epf)
   | _ => fun epf => (0, AInit)
   end (erefl _).
-
 
 Lemma locCn n d (C : PaxosCoh d):
   n \in nodes -> 
@@ -199,26 +198,29 @@ Proof.
 by case: C=>_ _ _ /(_ n)G; move: G; rewrite /localCoh/=.  
 Qed.
 
-Lemma getStE l i j pf pf' n:
-  getLocal n (getStatelet j l) = getLocal n (getStatelet i l) ->
-  @getSt n (getStatelet j l) pf' = @getSt n (getStatelet i l) pf.
-Proof.
-  admit.
-Admitted.
-
-
-Lemma getStP_K p d (C : PaxosCoh d) m:
-  getLocal p d = st :-> m -> getSt p C = m.
+Lemma getStK n d (C : PaxosCoh d)  s :
+  getLocal n d = st :-> s -> getSt n C = s.
 Proof.
 move=>E; rewrite /getSt/=.
-(* have pf : p \in nodes by rewrite inE eqxx. *)
-(* have V: valid (getLocal cn d) by case: (locCn C pf). *)
-(* move: (cohStC C); rewrite !E=>/= H. *)
-(* by apply: ieqc. *)
-(* Qed. *)
-admit.
-Admitted.
+move: (cohSt C); rewrite !E/==>H. 
+by apply: ieqc.
+Qed.
 
+Lemma getStE n i j C C' (pf : n \in nodes) :
+  getLocal n j = getLocal n i -> @getSt n j C' = @getSt n i C.
+Proof.
+case: {-1}(C)=>_ _ _/(_ _ pf).
+move=>[V][s][E]E'.
+rewrite (getStK C E).
+by apply: getStK; rewrite E'.
+Qed.
+
+Lemma getStE' n i j C C' (pf : n \in nodes) :
+  @getSt n j C' = @getSt n i C ->
+  getLocal n j = getLocal n i.
+Proof.
+case: {-1}(C)=>_ _ _/(_ _ pf).
+Admitted.
 
 (*** State Transitions ***)
 Definition fst' (tup: (nat * bool * proposal)%type): nat :=
