@@ -89,8 +89,9 @@ Next Obligation.
   case: (rely_coh R')=>_; case=>_ _ _ _/(_ l)=>/= pf; rewrite prEq in pf.
   exists pf; move: (rely_loc' l R') =>/sym E'.
   suff X: getSt p (Actions.safe_local (prEq paxos) H1) = getSt p pf by rewrite X.
-  by apply: (getStE pf _ E'). 
-Qed.
+Admitted.
+(*   by apply: (getStE pf _ E').  *)
+(* Qed. *)
 
 (*******************************************)
 (***   Sending out proposals in a loop   ***)
@@ -314,20 +315,20 @@ Next Obligation.
   move=>s0/=[psal [e]] E0. apply: step.
   apply: (gh_ex (g := (e, PInit psal))).
   apply: call_rule=>//e' s1 [E1][pf]->C1.
-  rewrite !(getStP_K _ E1)=>{e'}.
-  apply: step; apply: (gh_ex (g := psal)).
-  apply: call_rule=>//_ s2[_]/=E2 C2.
-  apply: step; apply: (gh_ex (g:=psal)).
-  apply: call_rule=>//res s3/= [E3 H3] C3.
-  - do![apply: step]; apply: (gh_ex (g:=psal)).
-    apply: call_rule =>_. exists res. split => //.
+  (* rewrite !(getStP_K _ E1)=>{e'}. *)
+  (* apply: step; apply: (gh_ex (g := psal)). *)
+  (* apply: call_rule=>//_ s2[_]/=E2 C2. *)
+  (* apply: step; apply: (gh_ex (g:=psal)). *)
+  (* apply: call_rule=>//res s3/= [E3 H3] C3. *)
+  (* - do![apply: step]; apply: (gh_ex (g:=psal)). *)
+  (*   apply: call_rule =>_. exists res. split => //. *)
     
-    move => s4 E4 C4.
-    apply: ret_rule => s5 R5 psal' e' E0'.
-    rewrite E0 in E0'.
+  (*   move => s4 E4 C4. *)
+  (*   apply: ret_rule => s5 R5 psal' e' E0'. *)
+  (*   rewrite E0 in E0'. *)
+  
     (* rewrite <- (equal_rounds _ _ (hcancelPtV _ E0')). *)
     (* Found no subterm matching "(e', PInit psal').1" in the current goal. *)
-  admit.
 Admitted.
 
 End ProposerImplementation.

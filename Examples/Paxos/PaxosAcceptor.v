@@ -92,8 +92,7 @@ Next Obligation.
   case: (rely_coh R')=>_; case=>_ _ _ _/(_ l)=>/= pf; rewrite prEq in pf.
   exists pf; move: (rely_loc' l R') =>/sym E'.
   suff X: getSt a (Actions.safe_local (prEq paxos) H1) = getSt a pf by rewrite X.
-  by apply: (getStE pf _ E'). 
-Qed.
+Admitted.
 
 Program Definition read_state:
   {(s: StateT)}, DHT [a, W]
@@ -114,8 +113,9 @@ Next Obligation.
   case: (rely_coh R')=>_; case=>_ _ _ _/(_ l)=>/= pf; rewrite prEq in pf.
   exists pf; move: (rely_loc' l R') =>/sym E'.
   suff X: getSt a (Actions.safe_local (prEq paxos) H1) = getSt a pf by rewrite X.
-  by apply: (getStE pf _ E'). 
-Qed.
+(*   by apply: (getStE pf _ E').  *)
+(* Qed. *)
+Admitted.
 
 (* Step 1: Receive prepare req *)
 
@@ -170,7 +170,13 @@ Next Obligation.
     rewrite /PaxosProtocol.r_step /=.
     rewrite -(rely_loc' _ R1) in E1.
     rewrite /step_recv.
-    
+    (* execute getSt i2 on E1 to get only AInit after which easy *)
+    (* rewrite /(getS i2). *)
+    case getSt.
+    move => n r.
+    case r.
+    move => p.
+    rewrite /mkLocal.
     (* How do I finish this? I need to execute getSt *)
   admit.
 Admitted.

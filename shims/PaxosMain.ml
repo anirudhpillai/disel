@@ -2,6 +2,7 @@ open Datatypes
 
 open Util
 open Shim
+open Unix
 
 type mode = Proposer | Acceptor
 
@@ -64,9 +65,24 @@ let main () =
       match mode with
       | Acceptor ->
         begin match int_of_nat me with
-        | 3 -> SimplePaxosApp.a_runner1 ()
-        | 4 -> SimplePaxosApp.a_runner2 ()
-        | 5 -> SimplePaxosApp.a_runner3 ()
+        | 3 ->
+          begin
+            try
+              SimplePaxosApp.a_runner1 ()
+            with _ -> print_endline "acceptor 1 exiting."
+          end
+        | 4 ->
+          begin
+            try
+              SimplePaxosApp.a_runner2 ()
+            with _ -> print_endline "acceptor 2 exiting."
+          end
+        | 5 ->
+          begin
+            try
+              SimplePaxosApp.a_runner3 ()
+            with _ -> print_endline "acceptor 3 exiting."
+          end
         | n -> usage ("unknown acceptor name " ^ string_of_int n)
         end
       | Proposer ->
@@ -75,13 +91,13 @@ let main () =
           begin
             try
               SimplePaxosApp.p_runner1 ()
-            with _ -> print_endline "A acceptor closed its connection, proposer exiting."
+            with _ -> print_endline "A acceptor closed its connection, proposer 1 exiting."
           end
         | 2 ->
           begin
             try
               SimplePaxosApp.p_runner2 ()
-            with _ -> print_endline "A acceptor closed its connection, proposer exiting."
+            with _ -> print_endline "A acceptor closed its connection, proposer 2 exiting."
           end
         | n -> usage ("unknown proposer name " ^ string_of_int n)
         end
