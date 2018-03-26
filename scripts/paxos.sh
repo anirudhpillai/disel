@@ -15,4 +15,4 @@ fi
 
 (./PaxosMain.d.byte -me 1 -mode proposer 1 127.0.0.1 8000 2 127.0.0.1 8001 3 127.0.0.1 8002 4 127.0.0.1 8003 5 127.0.0.1 8004 &) > proposer1.log 2>&1
 
-./PaxosMain.d.byte -me 2 -mode proposer 1 127.0.0.1 8000 2 127.0.0.1 8001 3 127.0.0.1 8002 4 127.0.0.1 8003 5 127.0.0.1 8004 | tee proposer2.log
+(./PaxosMain.d.byte -me 2 -mode proposer 1 127.0.0.1 8000 2 127.0.0.1 8001 3 127.0.0.1 8002 4 127.0.0.1 8003 5 127.0.0.1 8004 &) > proposer2.log 2>&1
