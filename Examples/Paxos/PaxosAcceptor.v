@@ -68,7 +68,6 @@ Qed.
 Implicit Arguments PaxosProtocol.PaxosCoh [proposers acceptors].
 Notation coh := (@PaxosProtocol.PaxosCoh proposers acceptors).
 Notation getS s := (getStatelet s l).
-(* ?? not sure if to use p or proposers *)
 Notation loc i := (getLocal a (getStatelet i l)).
 
 Export PaxosProtocol.
@@ -169,17 +168,9 @@ Next Obligation.
   - rewrite /r_prepare_req_inv; rewrite (rely_loc' _ R4) (rely_loc' _ R) locE//=.
     rewrite /PaxosProtocol.r_step /=.
     rewrite -(rely_loc' _ R1) in E1.
-    rewrite /step_recv.
-    (* execute getSt i2 on E1 to get only AInit after which easy *)
-    (* rewrite /(getS i2). *)
-    case getSt.
-    move => n r.
-    case r.
-    move => p.
-    rewrite /mkLocal.
-    (* How do I finish this? I need to execute getSt *)
-  admit.
-Admitted.
+    rewrite (getStK _ E1).
+    by rewrite /step_recv /mkLocal.
+Qed.
 Next Obligation.
   (* Can't apply ghC as no Hoare Type *)
   admit.
