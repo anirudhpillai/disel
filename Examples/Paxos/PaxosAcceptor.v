@@ -132,8 +132,8 @@ Definition r_prepare_req_inv (e : nat) (pinit: proposal): cont (option proposal)
 Program Definition receive_prepare_req_loop (e : nat):
   DHT [a, W]
   (fun i => loc i = st :-> (e, AInit),
-   fun res m => exists psal, res = Some psal /\
-       loc m = st :-> (e, APromised psal))
+   fun res m => exists psal, (res = Some psal) /\
+       (loc m = st :-> (e, APromised psal)))
   :=
   Do _ (@while a W _ _ r_prepare_req_cond (r_prepare_req_inv e) _
         (fun _ => Do _ (
@@ -173,8 +173,12 @@ Next Obligation.
 Qed.
 Next Obligation.
   (* Can't apply ghC as no Hoare Type *)
-  admit.
-Admitted.
+  move => i1/= E1.
+  apply: (gh_ex (g:=([::0; 0]))).
+  apply: call_rule => //r i2 [H1]H2 C2.
+  rewrite /r_prepare_req_cond/r_prepare_req_inv in H1 H2.
+    by case: r H1 H2 => //p _; exists p.
+Qed.
 
 (* Finds the promised number from current state *)
 Definition read_promised_number (rs: RoleState): nat :=
