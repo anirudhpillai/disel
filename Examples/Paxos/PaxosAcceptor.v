@@ -172,7 +172,6 @@ Next Obligation.
     by rewrite /step_recv /mkLocal.
 Qed.
 Next Obligation.
-  (* Can't apply ghC as no Hoare Type *)
   move => i1/= E1.
   apply: (gh_ex (g:=([::0; 0]))).
   apply: call_rule => //r i2 [H1]H2 C2.
@@ -238,25 +237,29 @@ Admitted.
 Definition r_acc_req_cond (res : option proposal) := res == None.
 
 (* Invariant relates the argument and the shape of the state *)
-Definition r_acc_req_inv (e : nat) (promised: bool) (psal: proposal): cont (option proposal) :=
+Definition r_acc_req_inv (e : nat) (promised: bool) (promised_psal: proposal) (received_psal: proposal): cont (option proposal) :=
   fun res i =>
-    if res is Some psal
-    then loc i = st :-> (e, AAccepted psal)
+    if res is Some received_psal
+    then if promised
+           then if head 0 promised_psal < head 0 received_psal
+             then loc i = st :-> (e, AAccepted received_psal)
+             else loc i = st :-> (e, APromised promised_psal)
+         else loc i = st :-> (e, AAccepted received_psal)
     else if promised
-         then loc i = st :-> (e, APromised psal)
+         then loc i = st :-> (e, APromised promised_psal)
          else loc i = st :-> (e, AInit).
 
 (* Loops until it receives a accept req *)
-Program Definition receive_acc_req_loop (e : nat) (promised: bool):
+Program Definition receive_acc_req_loop (e : nat) (promised: bool) (promised_psal: proposal):
   {(pinit: proposal)}, DHT [a, W]
    (fun i => if promised
-             then loc i = st :-> (e, APromised pinit)
+             then loc i = st :-> (e, APromised promised_psal)
              else loc i = st :-> (e, AInit),
   fun res m => exists psal, res = Some psal /\ (
-    loc m = st :-> (e, APromised psal) \/
+    loc m = st :-> (e, APromised promised_psal) \/
     loc m = st :-> (e, AAccepted psal)
   )) :=
-  Do _ (@while a W _ _ r_acc_req_cond (r_acc_req_inv e promised) _
+  Do _ (@while a W _ _ r_acc_req_cond (r_acc_req_inv e promised promised_psal) _
         (fun _ => Do _ (
            r <-- tryrecv_accept_req;
            match r with
@@ -283,24 +286,27 @@ Next Obligation.
   have P2: valid i2 by apply: (cohS (proj2 (rely_coh R1))).
   have P3: l \in dom i2 by rewrite-(cohD (proj2 (rely_coh R1)))/ddom gen_domPt inE/=.
   have D: rt = receive_accept_req_trans _ _.
-  -  move: Hin G. clear E1.
-     case => //. move => ->.
-     admit.
-  admit.
+  -  by move: Hin G; clear E1; do![case=>/=; first by move=>->].
   apply: ret_rule=>//i5 R4.
   - rewrite /r_acc_req_inv (rely_loc' _ R4) (rely_loc' _ R) locE//=.
-    rewrite -(rely_loc' _ R1) in E1.
-    rewrite D.
-    rewrite/step_recv/=.
-    rewrite /r_step.
-    rewrite /step_recv/=.
-Admitted.
+    case: (promised) E1 E2 D G=>/=E1 E2; case=>Z {E2}; subst rt=>//= _;
+    rewrite -(rely_loc' _ R1) in E1;
+    rewrite /r_step (getStK _ E1) /step_recv/= /mkLocal.
+    case: ifP=>G1; case: ifP => //; rewrite G1 => //.
+    done.
+Qed.    
 Next Obligation.
   apply: ghC=>i1 psal E1 C1/=.
   apply: (gh_ex (g := psal)); apply: call_rule => //r i2 [H1]H2 C2.
   rewrite /r_acc_req_cond/r_acc_req_inv in H1 H2; case: r H1 H2=>//b _ i2_AA.
   exists b.
-  by split => //; right.
+  split => //.
+  move: i2_AA.
+  case: ifP=>G1 => //.
+  case: ifP=>G2.
+  by right.
+  by left.
+  by right.
 Qed.
 
 (* Using resp_to_prepare_req 0 as a 'do nothing' transition for now.
@@ -328,8 +334,10 @@ Program Definition acceptor_round:
           end);;
          rs <-- read_state;
          (match rs with
-         | APromised _ => receive_acc_req_loop e true
-         | _  => receive_acc_req_loop e false
+         (* It's in promised state *)    
+         | APromised psal => receive_acc_req_loop e true psal
+         (* It hasn't promised anything *)
+         | _  => receive_acc_req_loop e false [:: 0; 0]
          end);;
          ret _ _ tt).
 Next Obligation.
