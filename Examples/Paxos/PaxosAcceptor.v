@@ -91,7 +91,8 @@ Next Obligation.
   case: (rely_coh R')=>_; case=>_ _ _ _/(_ l)=>/= pf; rewrite prEq in pf.
   exists pf; move: (rely_loc' l R') =>/sym E'.
   suff X: getSt a (Actions.safe_local (prEq paxos) H1) = getSt a pf by rewrite X.
-Admitted.
+    by apply: (getStE' pf _ E').
+Qed.
 
 Program Definition read_state:
   {(s: StateT)}, DHT [a, W]
@@ -112,9 +113,8 @@ Next Obligation.
   case: (rely_coh R')=>_; case=>_ _ _ _/(_ l)=>/= pf; rewrite prEq in pf.
   exists pf; move: (rely_loc' l R') =>/sym E'.
   suff X: getSt a (Actions.safe_local (prEq paxos) H1) = getSt a pf by rewrite X.
-(*   by apply: (getStE pf _ E').  *)
-(* Qed. *)
-Admitted.
+  by apply: (getStE' pf _ E').
+Qed.
 
 (* Step 1: Receive prepare req *)
 
@@ -193,42 +193,51 @@ Definition read_promised_value (rs: RoleState): nat :=
   end.
 
 (* Step 2: Respond promise or nack to the proposer *)
-Program Definition resp_to_prepare_req (e: nat) (prepare_no: nat)
+Program Definition resp_to_prepare_req (e: nat) (send_promise: bool) (prepare_no: nat)
   (promised_no: nat) (promised_val: nat):
   {(pif: (proposal * proposal))}, DHT [a, W]
    (fun i => loc i = st :-> (e, APromised pif.1) \/ loc i = st :-> (e, AInit),
     fun (_ : seq nat) m =>
-      if head 0 pif.2 > head 0 pif.1
+      if send_promise
       then loc m = st :-> (e, APromised pif.2)
       else loc m = st :-> (e, APromised pif.1))
   := Do (rs <-- read_state;
-         if prepare_no > promised_no
+         if send_promise
          then send_promise_resp [:: promised_no; promised_val] prepare_no
          else send_nack_resp [:: 0; 0] prepare_no).
 Next Obligation.
   apply:ghC=>i [pinit pfinal]E1 C1.
   have Pre: forall i2 proposer_id, network_rely W a i i2 ->
           Actions.send_act_safe W (p:=paxos) a l
-          (if prepare_no > promised_no
-           then (
-               send_promise_resp_trans proposers acceptors
-           )
-           else (
-               send_nack_resp_trans proposers acceptors
-          )) [:: e] proposer_id i2.
+          (if send_promise
+           then send_promise_resp_trans proposers acceptors
+           else send_nack_resp_trans proposers acceptors)
+          [:: e] proposer_id i2.
   - move=>i2 pid R1.
     split; first by case: (rely_coh R1).
     case: (proj2 (rely_coh R1))=>_ _ _ _/(_ l); rewrite (prEq paxos)=>C.
+    case: send_promise.
+    split => //.
 
-    case: prepare_no promised_no. split=>//.
-    admit. (* write Hin *)
+    (* Hin *)
     admit.
-    admit. (* write Hin *)
+
     admit.
+
+    (* Send safe *)
+    admit.
+    
     (* Need inE to work *)
+    (* rewrite /send_promise_resp_prec. *)
+    (* rewrite -(rely_loc' _ R1) in E1. *)
     (* + rewrite /Actions.can_send /nodes inE/= mem_cat Hpin orbC. *)
-    (* by rewrite -(cohD (proj2 (rely_coh R1)))/ddom gen_domPt inE/= eqxx. *)
+    (*     by rewrite -(cohD (proj2 (rely_coh R1)))/ddom gen_domPt inE/= eqxx. *)
+    admit.
+
+    (* All hooks fire *)
     by rewrite /Actions.filter_hooks um_filt0=>???/sym/find_some; rewrite dom0 inE.
+
+    (* verify i *)
     admit.
 Admitted.
 
@@ -329,8 +338,9 @@ Program Definition acceptor_round:
              let: prepare_no := head 0 body in
              let: promised_no := read_promised_number rs in
              let: promised_val := read_promised_value rs in
-             resp_to_prepare_req e prepare_no promised_no promised_val
-           | _  => resp_to_prepare_req e 0 0 0 (* results in sending nack *)
+             resp_to_prepare_req e (promised_no < prepare_no)
+               prepare_no promised_no promised_val
+           | _  => resp_to_prepare_req e false 0 0 0 (* results in sending nack *)
           end);;
          rs <-- read_state;
          (match rs with
@@ -353,8 +363,6 @@ Next Obligation.
   apply: (gh_ex (g:=(e, AInit))). apply: call_rule; last first.
   move=>y ? _ _.
   case: y=>//.
-  
-  admit.
 Admitted.
 
 

@@ -46,8 +46,6 @@ Inductive RoleState :=
 (* Acceptor states *)
 | AInit
 (* Holds the highest number promised in the proposal *)
-(* Storing a proposal and not just a nat as this makes it easier to catch the payload
-later on in the transitions *)
 | APromised of proposal
 (* Holds the highest number proposal accepted *)
 | AAccepted of proposal.
@@ -99,41 +97,19 @@ local state and message soup and then combine them to create PaxosCoh.
 Definition localCoh (n : nid) : Pred heap :=
   [Pred h | valid h /\ exists (s : StateT), h = st :-> s].
 
-
-(** ??
-What does tms_count do?
-Messages from Acceptor contain a Proposal/Nack
-Need to change (y : nat) to (y : Proposal)
- *)
 Definition tagFromNode (t : nat) : bool :=
   (t \in [:: prepare_req; accept_req; promise_resp; nack_resp]).
 
 Definition msgFromNode (tms : TaggedMessage) (y : nat) : Prop :=
   let: body := tms_cont tms in exists data, body = y :: data.
 
-(* ??
-This is saying that a proposer can only send a message to an acceptor and vice versa.
-Not sure if we need to impose this for Paxos especially since we have just one 
-RoleState..
-*)
 Definition cohMsg (ms: msg TaggedMessage) (y : nat) : Prop := True.
-  (* msgFromNode (content ms) y. *)
-  (* if from ms \in proposers *)
-  (* then to ms \in acceptors /\ msgFromProposer (content ms) y *)
-  (* else if from ms \in acceptors *)
-  (*      then to ms \in proposers /\ msgFromAcceptor (content ms) y *)
-  (*      else True. *)
 
-(** ??
-Coherence for the message soup.
-*)
+(** Coherence for the message soup. *)
 Definition soupCoh : Pred soup :=
   [Pred s | valid s /\
             forall m ms, find m s = Some ms -> exists y, cohMsg ms y].
 
-(** ??
-What is =i?
-*)
 Definition paxos_coh d : Prop :=
   let: dl := dstate d in
   let: ds := dsoup d in
@@ -154,8 +130,6 @@ Proof. by case. Qed.
 (* Wrapping up the coherence predicate *)
 Definition PaxosCoh := CohPred (CohPredMixin l1 l2 l3).
 
-
-(* TODO: Transition Lemmas *)
 Lemma send_soupCoh d m : 
     soupCoh (dsoup d) -> (exists y, cohMsg m y) -> soupCoh (post_msg (dsoup d) m).1.
 Proof.
@@ -172,8 +146,6 @@ Proof.
     by case: ifP=>///eqP->{z}; rewrite (cohDom C) D; apply: cohVl C.
 Qed.
 
-
-(* NOTE: These are temporary, no idea what I've done here *)
 Lemma cohSt n d (C : PaxosCoh d) s:
   find st (getLocal n d) = Some s ->
   idyn_tp s = StateT.
@@ -215,11 +187,10 @@ rewrite (getStK C E).
 by apply: getStK; rewrite E'.
 Qed.
 
-Lemma getStE' n i j C C' (pf : n \in nodes) :
-  @getSt n j C' = @getSt n i C ->
-  getLocal n j = getLocal n i.
+Lemma getStE' l i j pf pf' n:
+  getLocal n (getStatelet j l) = getLocal n (getStatelet i l) ->
+  @getSt n (getStatelet j l) pf' = @getSt n (getStatelet i l) pf.
 Proof.
-case: {-1}(C)=>_ _ _/(_ _ pf).
 Admitted.
 
 (*** State Transitions ***)
@@ -254,20 +225,6 @@ Fixpoint create_proposal_for_acc_req (xs: promises) (p: proposal): proposal :=
     else [:: (head 0 p); (last 0 max_proposal)]
   else [:: 0; 0].
 
-
-(* Test for highest numbered proposal
-Compute create_proposal_for_acc_req [:: (1, true, [:: 1; 1]);
-                                    (3, false, [:: 3; 4]);
-                                    (2, true, [:: 2; 8])
-                                    ] [:: 9; 1].
-
-Compute create_proposal_for_acc_req [:: (1, true, [:: 0; 0]);
-                                    (3, false, [:: 3; 4]);
-                                    (2, false, [:: 2; 8])
-                                    ] [:: 9; 1].
-*)
-
-
 (**
 Step Functions
 
@@ -301,9 +258,6 @@ Definition step_send (s: StateT) (to : nid) (p: proposal): StateT :=
       else (e, PSentAccReq (to :: tos) p') (* Keep sending *)
     | _ => (e, rs)
     end.
-
-
-(** ?? Do I need the ?_matches_tag s mtag : bool function? *)
 
 (**
 Receive Transitions:
@@ -455,9 +409,6 @@ End GenericSendTransitions.
 
 Section SendTransitions.
 
-
-(** TODO: Strengthen all pre conditions by putting conditions on (to: nid) **)
-  
 (* Send prepare request transition *)
 Definition send_prepare_req_prec (p: StateT) (m: payload) :=
   (exists n psal, p = (n, PInit psal)) \/
@@ -468,10 +419,6 @@ Program Definition send_prepare_req_trans : send_trans PaxosCoh :=
 Next Obligation.
   by rewrite /cohMsg.
 Qed.
-
-
-(** TODO: The below are solved because I'm not imposing any coherence requirement
-on the message. **)
 
 (* Send accept request transition *)
 Definition send_accept_req_prec (p: StateT) (m: payload) :=
@@ -521,7 +468,6 @@ Lemma r_step_coh : r_step_coh_t r_wf r_tag r_step.
 Proof.
   move=>d from this m C pf tms D F Wf T/=.
   rewrite /r_step; case X: (this \in nodes); last first.
-  admit.
 Admitted.
 
 Definition recv_trans := ReceiveTrans r_step_coh.
